@@ -1,10 +1,10 @@
-## 🚀 What's New in v0.0.1
+## 🚀 What's New in v1.0.0
 
 ### Changes
-- commit inicial
+- 🔼 Bump version to v0.0.1
 
 ### 📦 Installation
-Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v0.0.1/youtube-timestamp-manager.user.js)
+Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.0.0/youtube-timestamp-manager.user.js)
 
 ### 🔧 Compatibility
 - ✅ YouTube (all versions)
