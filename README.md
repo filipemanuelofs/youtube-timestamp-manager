@@ -1,6 +1,6 @@
 # YouTube Timestamp Manager
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/filipemanuelofs/youtube-timestamp-manager)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/filipemanuelofs/youtube-timestamp-manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Userscript](https://img.shields.io/badge/userscript-violentmonkey-orange.svg)](https://violentmonkey.github.io/)
 
