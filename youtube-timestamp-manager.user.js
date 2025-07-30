@@ -11,31 +11,70 @@
 // @homepageURL     https://github.com/filipemanuelofs/youtube-timestamp-manager
 // @supportURL      https://github.com/filipemanuelofs/youtube-timestamp-manager/issues
 // @license         MIT
-// @match           *://www.youtube.com/watch*
-// @match           *://www.youtube.com/live/*
-// @match           *://www.youtube.com/shorts/*
-// @match           *://m.youtube.com/watch*
-// @match           *://music.youtube.com/watch*
+// @match           *://www.youtube.com/*
+// @match           *://m.youtube.com/*
+// @match           *://music.youtube.com/*
 // @icon            data:image/svg+xml;base64,PCEtLQp0YWdzOiBbdGltZSwgaG91ciwgd29yaywgYWxhcm0sIG9uXQpjYXRlZ29yeTogU3lzdGVtCnZlcnNpb246ICIxLjEwNSIKdW5pY29kZTogImY1NDkiCi0tPgo8c3ZnCiAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogIHdpZHRoPSIzMiIKICBoZWlnaHQ9IjMyIgogIHZpZXdCb3g9IjAgMCAyNCAyNCIKICBmaWxsPSJub25lIgogIHN0cm9rZT0iIzAwMDAwMCIKICBzdHJva2Utd2lkdGg9IjEiCiAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIgogIHN0cm9rZS1saW5lam9pbj0icm91bmQiCj4KICA8cGF0aCBkPSJNMTIgN3Y1bDIgMiIgLz4KICA8cGF0aCBkPSJNMTcgMjJsNSAtM2wtNSAtM3oiIC8+CiAgPHBhdGggZD0iTTEzLjAxNyAyMC45NDNhOSA5IDAgMSAxIDcuODMxIC03LjI5MiIgLz4KPC9zdmc+Cg==
 // @grant           none
-// @run-at          document-end
+// @run-at          document-start
 // @noframes
 // ==/UserScript==
+
 (function () {
   "use strict";
 
-  if (document.querySelector("#ytls-pane")) return;
-
-  const elements = {
+  let elements = {
     video: null,
     pane: null,
   };
 
-  const state = {
+  let state = {
     nowid: null,
-    firstcopy: true,
     videoId: null,
+    currentUrl: location.href,
   };
+
+  function shouldShowTimestampManager() {
+    const url = location.href;
+    return (
+      url.includes("/watch") ||
+      url.includes("/live/") ||
+      url.includes("/shorts/")
+    );
+  }
+
+  function cleanupTimestampManager() {
+    if (state.nowid) {
+      cancelAnimationFrame(state.nowid);
+      state.nowid = null;
+    }
+
+    if (elements.pane) {
+      elements.pane.remove();
+      elements.pane = null;
+    }
+
+    window.removeEventListener("beforeunload", handlers.warn);
+    elements.video = null;
+    state.videoId = null;
+  }
+
+  function initTimestampManager() {
+    // Limpa instância anterior se existir
+    cleanupTimestampManager();
+
+    // Aguarda o vídeo carregar
+    const checkVideo = () => {
+      const video = document.querySelector("video");
+      if (video && shouldShowTimestampManager()) {
+        ui.init();
+      } else if (shouldShowTimestampManager()) {
+        setTimeout(checkVideo, 500);
+      }
+    };
+
+    setTimeout(checkVideo, 100);
+  }
 
   const utils = {
     formatTime(time) {
@@ -203,14 +242,7 @@
   const handlers = {
     closePane() {
       if (confirm("Close timestamp tool?")) {
-        if (state.nowid) {
-          cancelAnimationFrame(state.nowid);
-        }
-        elements.pane?.remove();
-        window.removeEventListener("beforeunload", handlers.warn);
-        elements.video = null;
-        elements.pane = null;
-        state.videoId = null;
+        cleanupTimestampManager();
       }
     },
 
@@ -241,7 +273,7 @@
           }
         }
       } catch (e) {
-        console.error("[YT Timestamp Manager] Watch time failed:", error);
+        console.error("[YT Timestamp Manager] Watch time failed:", e);
       }
       state.nowid = requestAnimationFrame(handlers.watchTime);
     },
@@ -447,7 +479,7 @@
 
       const box = document.createElement("textarea");
       box.id = "ytls-box";
-      box.style.display = "none"; // Oculto por padrão
+      box.style.display = "none";
 
       const buttons = document.createElement("div");
       buttons.className = "ytls-buttons";
@@ -659,5 +691,38 @@
     },
   };
 
-  ui.init();
+  // Execução inicial
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTimestampManager);
+  } else {
+    initTimestampManager();
+  }
+
+  // Observer para detectar mudanças de URL (navegação SPA)
+  let lastUrl = location.href;
+  new MutationObserver(() => {
+    const url = location.href;
+    if (url !== lastUrl) {
+      lastUrl = url;
+      state.videoId = null; // Reset videoId para nova página
+      setTimeout(() => {
+        if (shouldShowTimestampManager()) {
+          initTimestampManager();
+        } else {
+          cleanupTimestampManager();
+        }
+      }, 100);
+    }
+  }).observe(document, { subtree: true, childList: true });
+
+  // Fallback para eventos de navegação
+  window.addEventListener("popstate", () => {
+    setTimeout(() => {
+      if (shouldShowTimestampManager()) {
+        initTimestampManager();
+      } else {
+        cleanupTimestampManager();
+      }
+    }, 100);
+  });
 })();
