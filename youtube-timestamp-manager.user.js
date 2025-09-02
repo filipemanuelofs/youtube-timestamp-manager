@@ -459,9 +459,9 @@
           transform: translate(-50%, -50%);
           width: 3px;
           height: 12px;
-          background: #ffd86bff;
+          background: #ff6b6b;
           border-radius: 2px;
-          box-shadow: 0 0 4px rgba(255, 240, 107, 0.6);
+          box-shadow: 0 0 4px rgba(255, 107, 107, 0.6);
           transition: all 0.2s ease;
         `;
 
@@ -526,7 +526,7 @@
           tooltip.style.visibility = "hidden";
           marker.style.height = "12px";
           marker.style.width = "3px";
-          marker.style.background = "#ff6b6b";
+          marker.style.background = "#ffd86bff";
           marker.style.boxShadow = "0 0 4px rgba(255, 107, 107, 0.6)";
         });
 
