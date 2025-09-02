@@ -1,11 +1,11 @@
-## 🚀 What's New in v1.0.1
+## 🚀 What's New in v1.0.2
 
 ### Changes
-- 🔼 Bump version to v1.0.0
-- correção do comportamento do widget ao entrar em um vídeo pela página inicial
+- 🔼 Bump version to v1.0.1
+- adição de marcador visual na barra de progresso
 
 ### 📦 Installation
-Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.0.1/youtube-timestamp-manager.user.js)
+Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.0.2/youtube-timestamp-manager.user.js)
 
 ### 🔧 Compatibility
 - ✅ YouTube (all versions)
