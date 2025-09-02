@@ -526,7 +526,7 @@
           tooltip.style.visibility = "hidden";
           marker.style.height = "12px";
           marker.style.width = "3px";
-          marker.style.background = "#ffd86bff";
+          marker.style.background = "#ff6b6b";
           marker.style.boxShadow = "0 0 4px rgba(255, 107, 107, 0.6)";
         });
 
