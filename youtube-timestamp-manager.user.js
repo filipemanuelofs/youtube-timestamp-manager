@@ -54,6 +54,8 @@
       elements.pane = null;
     }
 
+    progressMarkers.destroy();
+
     window.removeEventListener("beforeunload", handlers.warn);
     elements.video = null;
     state.videoId = null;
@@ -68,6 +70,7 @@
       const video = document.querySelector("video");
       if (video && shouldShowTimestampManager()) {
         ui.init();
+        setTimeout(() => progressMarkers.init(), 1500);
       } else if (shouldShowTimestampManager()) {
         setTimeout(checkVideo, 500);
       }
@@ -300,6 +303,8 @@
       textInput.focus();
 
       handlers.saveCurrentTimestamps();
+
+      progressMarkers.updateMarkers();
     },
 
     async copyList() {
@@ -344,10 +349,16 @@
       listItems.forEach((item) => {
         const time = parseInt(item.querySelector("a").dataset.time);
         const note = item.querySelector("input").value;
-        timestamps.push({ time, note });
+        const creation = new Date().toISOString();
+        const expiration = new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000
+        ).toISOString();
+        timestamps.push({ time, note, creation, expiration });
       });
 
       utils.saveTimestamps(videoId, timestamps);
+
+      progressMarkers.updateMarkers();
     },
 
     loadSavedTimestamps() {
@@ -365,6 +376,116 @@
             savedTimestamps.length > 1 ? "s" : ""
           } loaded!`
         );
+      }
+    },
+  };
+
+  const progressMarkers = {
+    markersContainer: null,
+
+    init() {
+      this.createMarkersContainer();
+      this.updateMarkers();
+    },
+
+    createMarkersContainer() {
+      // Remove container anterior se existir
+      if (this.markersContainer) {
+        this.markersContainer.remove();
+      }
+
+      // Encontra a barra de progresso do YouTube
+      const progressBar = document.querySelector(
+        ".ytp-progress-bar-container, .ytp-progress-bar"
+      );
+      if (!progressBar) {
+        setTimeout(() => this.createMarkersContainer(), 1000);
+        return;
+      }
+
+      // Cria container para os marcadores
+      this.markersContainer = document.createElement("div");
+      this.markersContainer.className = "ytts-progress-markers";
+      this.markersContainer.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 100;
+      `;
+
+      progressBar.appendChild(this.markersContainer);
+    },
+
+    updateMarkers() {
+      if (!this.markersContainer) {
+        this.init();
+        return;
+      }
+
+      // Limpa marcadores existentes
+      this.markersContainer.innerHTML = "";
+
+      const video = utils.getVideo();
+      if (!video || !video.duration) return;
+
+      const videoDuration = video.duration;
+
+      // Obtém timestamps atuais
+      const timestamps = this.getCurrentTimestamps();
+
+      timestamps.forEach((timestamp) => {
+        const marker = document.createElement("div");
+        const position = (timestamp.time / videoDuration) * 100;
+
+        marker.style.cssText = `
+          position: absolute;
+          left: ${position}%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 3px;
+          height: 12px;
+          background: #ff6b6b;
+          border-radius: 2px;
+          box-shadow: 0 0 4px rgba(255, 107, 107, 0.6);
+          pointer-events: none;
+          z-index: 101;
+        `;
+
+        marker.title = `${utils.formatTime(timestamp.time)}${
+          timestamp.note ? ` - ${timestamp.note}` : ""
+        }`;
+        this.markersContainer.appendChild(marker);
+      });
+    },
+
+    getCurrentTimestamps() {
+      const timestamps = [];
+      const listItems = document.querySelectorAll(
+        "#ytls-pane ul li:not(.now-playing)"
+      );
+
+      listItems.forEach((item) => {
+        const timeElement = item.querySelector("a");
+        const noteElement = item.querySelector("input");
+
+        if (timeElement && timeElement.dataset.time) {
+          timestamps.push({
+            time: parseInt(timeElement.dataset.time),
+            note: noteElement ? noteElement.value : "",
+          });
+        }
+      });
+
+      return timestamps;
+    },
+
+    destroy() {
+      if (this.markersContainer) {
+        this.markersContainer.remove();
+        this.markersContainer = null;
       }
     },
   };
@@ -663,6 +784,24 @@
         #ytls-box {
           display: none;
         }
+        .ytts-progress-markers {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          pointer-events: none !important;
+          z-index: 100 !important;
+        }
+
+        .ytts-progress-markers div {
+          transition: all 0.2s ease;
+        }
+
+        .ytts-progress-markers div:hover {
+          height: 16px !important;
+          box-shadow: 0 0 8px rgba(255, 107, 107, 0.8) !important;
+        }
       `;
 
       list.addEventListener("click", handlers.clickStamp);
@@ -686,6 +825,10 @@
       setTimeout(() => {
         handlers.loadSavedTimestamps();
       }, 1000);
+
+      setTimeout(() => {
+        progressMarkers.init();
+      }, 1500);
 
       return pane;
     },
