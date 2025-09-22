@@ -23,6 +23,15 @@
 (function () {
   "use strict";
 
+  const ICONS = {
+    close: `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="1" x2="13" y2="13" stroke="#F2F2F2" stroke-width="2"/><line x1="13" y1="1" x2="1" y2="13" stroke="#F2F2F2" stroke-width="2"/></svg>`,
+    minimize: `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="#F2F2F2" stroke-width="2"/></svg>`,
+    expand: `<svg fill="#f2f2f2" width="14" height="14" viewBox="0 0 52 52" xml:space="preserve"><path d="M48.8 2H33.3c-1 0-1.3.9-.5 1.7l4.9 4.9-9 9c-.5.5-.5 1.3 0 1.9l3.7 3.7c.5.5 1.3.5 1.9 0l9.1-9.1 4.9 4.9c.8.8 1.7.5 1.7-.5V3.1c0-.6-.6-1.1-1.2-1.1M3.5 50h15.4c1 0 1.3-1.1.5-1.9l-4.9-5 9-9.1c.5-.5.5-1.4 0-1.9l-3.7-3.7c-.5-.5-1.3-.5-1.9 0l-9 9-5-4.9C3 31.7 2 32 2 33v15.4c0 .7.8 1.6 1.5 1.6M50 48.8V33.3c0-1-.9-1.3-1.7-.5l-4.9 4.9-9-9c-.5-.5-1.3-.5-1.9 0l-3.7 3.7c-.5.5-.5 1.3 0 1.9l9.1 9.1-4.9 4.9c-.8.8-.5 1.7.5 1.7h15.4c.6 0 1.1-.6 1.1-1.2M2 3.5v15.4c0 1 1.1 1.3 1.9.5l5-4.9 9.1 9c.5.5 1.4.5 1.9 0l3.7-3.7c.5-.5.5-1.3 0-1.9l-9-9 4.9-5C20.3 3 20 2 19 2H3.6C2.9 2 2 2.8 2 3.5"/></svg>`,
+    settings: `<svg width="16" height="14" viewBox="0 0 24 24"><path fill="#F2F2F2" d="M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8Zm0-6l2 4l4 .5l-3 3l.5 4l-4-2l-4 2l.5-4l-3-3l4-.5Z"/></svg>`,
+    copy: `<svg height="14px" viewBox="0 -960 960 960" width="14px" fill="#F2F2F2"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>`,
+    delete: `<svg height="14px" viewBox="0 -960 960 960" width="14px" fill="#e62a2b"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`,
+  };
+
   let elements = {
     video: null,
     pane: null,
@@ -596,19 +605,11 @@
 
       copyBtn.className = "copy-btn";
       copyBtn.title = "Copy timestamp";
-      copyBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3">
-          <path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/>
-        </svg>
-      `;
+      copyBtn.innerHTML = ICONS.copy;
 
       deleteBtn.className = "delete-btn";
       deleteBtn.title = "Delete timestamp";
-      deleteBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#f44336">
-          <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
-        </svg>
-      `;
+      deleteBtn.innerHTML = ICONS.delete;
 
       copyBtn.addEventListener("click", () => {
         handlers.copyIndividualTimestamp(a, textInput);
@@ -641,12 +642,12 @@
       header.className = "ytls-header";
 
       const minimizeBtn = document.createElement("span");
-      minimizeBtn.textContent = "−";
+      minimizeBtn.innerHTML = ICONS.minimize;
       minimizeBtn.className = "minimize-btn";
       minimizeBtn.title = "Minimize";
 
       const exitBtn = document.createElement("span");
-      exitBtn.textContent = "×";
+      exitBtn.innerHTML = ICONS.close;
       exitBtn.className = "exit-btn";
       exitBtn.title = "Close";
 
@@ -655,11 +656,11 @@
 
         if (isMinimized) {
           pane.classList.remove("minimized");
-          minimizeBtn.textContent = "−";
+          minimizeBtn.innerHTML = ICONS.minimize;
           minimizeBtn.title = "Minimize";
         } else {
           pane.classList.add("minimized");
-          minimizeBtn.textContent = "+";
+          minimizeBtn.innerHTML = ICONS.expand;
           minimizeBtn.title = "Restore";
         }
       });
@@ -694,7 +695,7 @@
       addBtn.addEventListener("click", handlers.addStamp);
 
       const copyBtn = document.createElement("button");
-      copyBtn.textContent = "Copy List";
+      copyBtn.textContent = "Copy Timestamps";
       copyBtn.dataset.action = "copy";
       copyBtn.addEventListener("click", handlers.copyList);
 
@@ -727,19 +728,7 @@
           gap: 4px;
           margin-bottom: 5px;
         }
-        .minimize-btn {
-          color: #FFC107;
-          cursor: pointer;
-          font-size: 18px;
-          font-weight: bold;
-          line-height: 1;
-          padding: 2px 5px;
-          border-radius: 3px;
-          transition: background-color 0.2s ease;
-        }
-        .minimize-btn:hover {
-          background: rgba(255, 193, 7, 0.2);
-        }
+        .minimize-btn,
         .exit-btn {
           color: white;
           cursor: pointer;
@@ -750,6 +739,7 @@
           border-radius: 3px;
           transition: background-color 0.2s ease;
         }
+        .minimize-btn:hover,
         .exit-btn:hover {
           background: rgba(255,255,255,0.2);
         }
