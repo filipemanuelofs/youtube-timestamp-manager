@@ -1,11 +1,11 @@
-## 🚀 What's New in v1.0.5
+## 🚀 What's New in v1.0.6
 
 ### Changes
-- 🔼 Bump version to v1.0.4
-- correção da cor do marcador no evento mouseleave
+- 🔼 Bump version to v1.0.5
+- atualização dos ícones, reutilização de css, atualização do texto do botão para copiar timestamps
 
 ### 📦 Installation
-Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.0.5/youtube-timestamp-manager.user.js)
+Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.0.6/youtube-timestamp-manager.user.js)
 
 ### 🔧 Compatibility
 - ✅ YouTube (all versions)
