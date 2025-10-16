@@ -24,12 +24,12 @@
   "use strict";
 
   const ICONS = {
-    close: `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="1" x2="13" y2="13" stroke="#F2F2F2" stroke-width="2"/><line x1="13" y1="1" x2="1" y2="13" stroke="#F2F2F2" stroke-width="2"/></svg>`,
-    minimize: `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="#F2F2F2" stroke-width="2"/></svg>`,
-    expand: `<svg fill="#f2f2f2" width="14" height="14" viewBox="0 0 52 52" xml:space="preserve"><path d="M48.8 2H33.3c-1 0-1.3.9-.5 1.7l4.9 4.9-9 9c-.5.5-.5 1.3 0 1.9l3.7 3.7c.5.5 1.3.5 1.9 0l9.1-9.1 4.9 4.9c.8.8 1.7.5 1.7-.5V3.1c0-.6-.6-1.1-1.2-1.1M3.5 50h15.4c1 0 1.3-1.1.5-1.9l-4.9-5 9-9.1c.5-.5.5-1.4 0-1.9l-3.7-3.7c-.5-.5-1.3-.5-1.9 0l-9 9-5-4.9C3 31.7 2 32 2 33v15.4c0 .7.8 1.6 1.5 1.6M50 48.8V33.3c0-1-.9-1.3-1.7-.5l-4.9 4.9-9-9c-.5-.5-1.3-.5-1.9 0l-3.7 3.7c-.5.5-.5 1.3 0 1.9l9.1 9.1-4.9 4.9c-.8.8-.5 1.7.5 1.7h15.4c.6 0 1.1-.6 1.1-1.2M2 3.5v15.4c0 1 1.1 1.3 1.9.5l5-4.9 9.1 9c.5.5 1.4.5 1.9 0l3.7-3.7c.5-.5.5-1.3 0-1.9l-9-9 4.9-5C20.3 3 20 2 19 2H3.6C2.9 2 2 2.8 2 3.5"/></svg>`,
-    settings: `<svg width="16" height="14" viewBox="0 0 24 24"><path fill="#F2F2F2" d="M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8Zm0-6l2 4l4 .5l-3 3l.5 4l-4-2l-4 2l.5-4l-3-3l4-.5Z"/></svg>`,
-    copy: `<svg height="14px" viewBox="0 -960 960 960" width="14px" fill="#F2F2F2"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>`,
-    delete: `<svg height="14px" viewBox="0 -960 960 960" width="14px" fill="#e62a2b"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`,
+    close: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="1" x2="13" y2="13" stroke="#F2F2F2" stroke-width="2"/><line x1="13" y1="1" x2="1" y2="13" stroke="#F2F2F2" stroke-width="2"/></svg>`,
+    minimize: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="#F2F2F2" stroke-width="2"/></svg>`,
+    expand: `<svg xmlns="http://www.w3.org/2000/svg" fill="#f2f2f2" width="14" height="14" viewBox="0 0 52 52" xml:space="preserve"><path d="M48.8 2H33.3c-1 0-1.3.9-.5 1.7l4.9 4.9-9 9c-.5.5-.5 1.3 0 1.9l3.7 3.7c.5.5 1.3.5 1.9 0l9.1-9.1 4.9 4.9c.8.8 1.7.5 1.7-.5V3.1c0-.6-.6-1.1-1.2-1.1M3.5 50h15.4c1 0 1.3-1.1.5-1.9l-4.9-5 9-9.1c.5-.5.5-1.4 0-1.9l-3.7-3.7c-.5-.5-1.3-.5-1.9 0l-9 9-5-4.9C3 31.7 2 32 2 33v15.4c0 .7.8 1.6 1.5 1.6M50 48.8V33.3c0-1-.9-1.3-1.7-.5l-4.9 4.9-9-9c-.5-.5-1.3-.5-1.9 0l-3.7 3.7c-.5.5-.5 1.3 0 1.9l9.1 9.1-4.9 4.9c-.8.8-.5 1.7.5 1.7h15.4c.6 0 1.1-.6 1.1-1.2M2 3.5v15.4c0 1 1.1 1.3 1.9.5l5-4.9 9.1 9c.5.5 1.4.5 1.9 0l3.7-3.7c.5-.5.5-1.3 0-1.9l-9-9 4.9-5C20.3 3 20 2 19 2H3.6C2.9 2 2 2.8 2 3.5"/></svg>`,
+    settings: `<svg xmlns="http://www.w3.org/2000/svg" fill="#f2f2f2" width="16" height="16" viewBox="0 0 0.4 0.4" xml:space="preserve"><path d="M.22.4H.18A.02.02 0 0 1 .162.386L.144.334.096.36Q.084.366.072.356L.044.328A.02.02 0 0 1 .04.304L.064.256.012.238Q.002.233 0 .22V.18A.02.02 0 0 1 .014.162L.066.144.04.096A.02.02 0 0 1 .044.072L.072.044A.02.02 0 0 1 .096.04l.048.024.018-.052Q.166.002.18 0h.04a.02.02 0 0 1 .018.014l.018.052L.304.04a.02.02 0 0 1 .024.004l.028.028A.02.02 0 0 1 .36.096L.336.144l.052.018Q.398.166.4.18v.04a.02.02 0 0 1-.014.018L.334.256l.024.048a.02.02 0 0 1-.004.024L.326.356A.02.02 0 0 1 .302.36L.254.336.236.388C.236.394.228.4.22.4M.194.36h.012L.224.306C.228.294.248.286.258.292L.31.318.318.31.292.258C.286.246.294.228.306.224L.36.206V.194L.306.176C.294.172.286.152.292.142L.318.09.31.082.258.108C.246.114.228.106.224.094L.206.04H.194L.176.094C.172.106.152.114.142.108L.09.082.082.09l.026.052C.114.154.106.172.094.176L.04.194v.012l.054.018c.012.004.02.024.014.034L.082.31.09.318.142.292c.012-.006.03.002.034.014z"/><path d="M.24.2A.04.04 0 0 1 .2.24.04.04 0 0 1 .16.2a.04.04 0 0 1 .08 0"/></svg>`,
+    copy: `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#F2F2F2"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>`,
+    delete: `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#e62a2b"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`,
   };
 
   let elements = {
@@ -249,6 +249,59 @@
         );
       }
     },
+
+    cleanExpiredTimestamps() {
+      try {
+        const now = new Date().toISOString();
+        let cleanedCount = 0;
+
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("ytts_")) {
+            const data = localStorage.getItem(key);
+            if (data) {
+              const timestamps = JSON.parse(data);
+              const validTimestamps = timestamps.filter(
+                (ts) => !ts.expiration || ts.expiration > now
+              );
+
+              if (validTimestamps.length !== timestamps.length) {
+                cleanedCount += timestamps.length - validTimestamps.length;
+                if (validTimestamps.length > 0) {
+                  localStorage.setItem(key, JSON.stringify(validTimestamps));
+                } else {
+                  localStorage.removeItem(key);
+                }
+              }
+            }
+          }
+        }
+
+        if (cleanedCount > 0) {
+          utils.showNotification(
+            `🧹 Cleaned ${cleanedCount} expired timestamp${
+              cleanedCount > 1 ? "s" : ""
+            }!`
+          );
+
+          // Recarrega timestamps se estiver na mesma página
+          const currentVideoId = utils.getVideoId();
+          if (currentVideoId) {
+            const listItems = document.querySelectorAll(
+              "#ytls-pane ul li:not(.now-playing)"
+            );
+            listItems.forEach((item) => item.remove());
+            handlers.loadSavedTimestamps();
+            progressMarkers.updateMarkers();
+          }
+        }
+      } catch (error) {
+        console.error(
+          "[YT Timestamp Manager] Failed to clean expired timestamps:",
+          error
+        );
+      }
+    },
   };
 
   const handlers = {
@@ -381,10 +434,14 @@
 
       if (savedTimestamps.length > 0) {
         utils.showNotification(
-          `📥 ${savedTimestamps.length} saved timestamp${
+          `✅ ${savedTimestamps.length} saved timestamp${
             savedTimestamps.length > 1 ? "s" : ""
           } loaded!`
         );
+      }
+
+      if (ui.getAutoCleanupSetting()) {
+        utils.cleanExpiredTimestamps();
       }
     },
   };
@@ -641,6 +698,11 @@
       const header = document.createElement("div");
       header.className = "ytls-header";
 
+      const settingsBtn = document.createElement("span");
+      settingsBtn.innerHTML = ICONS.settings;
+      settingsBtn.className = "settings-btn";
+      settingsBtn.title = "Settings";
+
       const minimizeBtn = document.createElement("span");
       minimizeBtn.innerHTML = ICONS.minimize;
       minimizeBtn.className = "minimize-btn";
@@ -650,6 +712,8 @@
       exitBtn.innerHTML = ICONS.close;
       exitBtn.className = "exit-btn";
       exitBtn.title = "Close";
+
+      settingsBtn.addEventListener("click", ui.openSettingsModal);
 
       minimizeBtn.addEventListener("click", () => {
         const isMinimized = pane.classList.contains("minimized");
@@ -667,6 +731,7 @@
 
       exitBtn.addEventListener("click", handlers.closePane);
 
+      header.appendChild(settingsBtn);
       header.appendChild(minimizeBtn);
       header.appendChild(exitBtn);
 
@@ -875,6 +940,126 @@
           height: 16px !important;
           box-shadow: 0 0 8px rgba(255, 107, 107, 0.8) !important;
         }
+        #ytts-settings-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.8);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 10000;
+        }
+
+        .ytts-settings-content {
+          background: #1a1a1a;
+          border-radius: 8px;
+          padding: 0;
+          min-width: 300px;
+          max-width: 90vw;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .ytts-settings-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ytts-settings-header h3 {
+          margin: 0;
+          color: white;
+          font-size: 16px;
+          font-weight: 500;
+        }
+
+        .ytts-settings-close {
+          color: white;
+          cursor: pointer;
+          font-size: 24px;
+          line-height: 1;
+          padding: 4px;
+          border-radius: 4px;
+          transition: background-color 0.2s ease;
+        }
+
+        .ytts-settings-close:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .ytts-settings-body {
+          padding: 20px;
+        }
+
+        .ytts-setting-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: white;
+          cursor: pointer;
+          font-size: 14px;
+        }
+
+        .ytts-setting-item input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          accent-color: #4FC3F7;
+          cursor: pointer;
+        }
+
+        .ytts-settings-footer {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-end;
+          padding: 16px 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ytts-settings-footer button {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 4px;
+          padding: 8px 16px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .ytts-settings-footer button:hover {
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        #ytts-save-settings {
+          background: #4FC3F7;
+          border-color: #4FC3F7;
+        }
+
+        #ytts-save-settings:hover {
+          background: #81D4FA;
+          border-color: #81D4FA;
+        }
+
+        .settings-btn {
+          color: #e3e3e3;
+          cursor: pointer;
+          padding: 2px 5px;
+          border-radius: 3px;
+          transition: background-color 0.2s ease;
+        }
+
+        .settings-btn:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .settings-btn svg {
+          display: block;
+        }
       `;
 
       list.addEventListener("click", handlers.clickStamp);
@@ -882,7 +1067,7 @@
         passive: true,
       });
 
-      window.addEventListener("beforeunload", handlers.warn);
+      window.addEventListener("unload", handlers.warn);
 
       pane.appendChild(header);
       pane.appendChild(list);
@@ -904,6 +1089,82 @@
       }, 1500);
 
       return pane;
+    },
+
+    openSettingsModal() {
+      if (document.querySelector("#ytts-settings-modal")) return;
+
+      const modal = document.createElement("div");
+      modal.id = "ytts-settings-modal";
+      modal.innerHTML = `
+        <div class="ytts-settings-content">
+          <div class="ytts-settings-header">
+            <h3>Settings</h3>
+            <span class="ytts-settings-close">&times;</span>
+          </div>
+          <div class="ytts-settings-body">
+            <label class="ytts-setting-item">
+              <input type="checkbox" id="auto-cleanup-expired" ${
+                ui.getAutoCleanupSetting() ? "checked" : ""
+              }>
+              <span>
+                Automatically clean expired timestamps <br>
+                <small>The expiration date is 1 month after the date the timestamp was added.</small>
+              </span>
+            </label>
+          </div>
+          <div class="ytts-settings-footer">
+            <button id="ytts-save-settings">Save</button>
+            <button id="ytts-cancel-settings">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Event listeners
+      modal
+        .querySelector(".ytts-settings-close")
+        .addEventListener("click", () => modal.remove());
+      modal
+        .querySelector("#ytts-cancel-settings")
+        .addEventListener("click", () => modal.remove());
+      modal
+        .querySelector("#ytts-save-settings")
+        .addEventListener("click", ui.saveSettings);
+
+      // Fechar ao clicar fora
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) modal.remove();
+      });
+    },
+
+    getAutoCleanupSetting() {
+      try {
+        return localStorage.getItem("ytts_auto_cleanup") === "true";
+      } catch (error) {
+        return false;
+      }
+    },
+
+    saveSettings() {
+      const autoCleanup = document.querySelector(
+        "#auto-cleanup-expired"
+      ).checked;
+
+      try {
+        localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
+
+        if (autoCleanup) {
+          utils.cleanExpiredTimestamps();
+        }
+
+        utils.showNotification("✅ Settings saved!");
+      } catch (error) {
+        utils.showNotification("❌ Failed to save settings", 1500);
+      }
+
+      document.querySelector("#ytts-settings-modal").remove();
     },
   };
 
