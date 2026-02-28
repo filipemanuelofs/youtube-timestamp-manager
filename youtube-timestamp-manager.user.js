@@ -706,18 +706,21 @@
 
       settingsBtn.addEventListener("click", ui.openSettingsModal);
 
-      minimizeBtn.addEventListener("click", () => {
-        const isMinimized = pane.classList.contains("minimized");
-
-        if (isMinimized) {
-          pane.classList.remove("minimized");
-          minimizeBtn.textContent = "🔽";
-          minimizeBtn.title = "Minimize";
-        } else {
+      const setMinimized = (minimized) => {
+        if (minimized) {
           pane.classList.add("minimized");
           minimizeBtn.textContent = "🔼";
           minimizeBtn.title = "Restore";
+        } else {
+          pane.classList.remove("minimized");
+          minimizeBtn.textContent = "🔽";
+          minimizeBtn.title = "Minimize";
         }
+      };
+
+      minimizeBtn.addEventListener("click", () => {
+        const isMinimized = pane.classList.contains("minimized");
+        setMinimized(!isMinimized);
       });
 
       exitBtn.addEventListener("click", handlers.closePane);
@@ -1026,6 +1029,8 @@
       setTimeout(() => {
         progressMarkers.init();
       }, 1500);
+
+      setMinimized(true);
 
       return pane;
     },
