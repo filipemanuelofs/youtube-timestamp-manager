@@ -1,11 +1,11 @@
-## 🚀 What's New in v1.1.0
+## 🚀 What's New in v1.1.1
 
 ### Changes
-- 🔼 Bump version to v1.0.6
-- feature: adição de menu de configuração; remoção de beforeunload que impedia a atualização/fechamento da página sempre com um popup
+- 🔼 Bump version to v1.1.0
+- remoção de atributo innerHTML que causa violação de CSP
 
 ### 📦 Installation
-Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.1.0/youtube-timestamp-manager.user.js)
+Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.1.1/youtube-timestamp-manager.user.js)
 
 ### 🔧 Compatibility
 - ✅ YouTube (all versions)
