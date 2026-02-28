@@ -651,13 +651,13 @@
         }, 500),
       );
 
-      copyBtn.className = "copy-btn";
+      copyBtn.classList.add("ytts-icon-btn");
       copyBtn.title = "Copy timestamp";
       copyBtn.textContent = "📋";
 
-      deleteBtn.className = "delete-btn";
+      deleteBtn.classList.add("ytts-icon-btn");
       deleteBtn.title = "Delete timestamp";
-      deleteBtn.textContent = "🗑";
+      deleteBtn.textContent = "⛔";
 
       copyBtn.addEventListener("click", () => {
         handlers.copyIndividualTimestamp(a, textInput);
@@ -816,7 +816,7 @@
         #ytls-pane a {
           color: #4FC3F7;
           text-decoration: none;
-          min-width: 60px;
+          min-width: 30px;
           font-family: monospace;
           cursor: pointer;
           transition: color 0.2s ease;
@@ -843,35 +843,6 @@
         #ytls-pane input:disabled {
           opacity: 0.6;
           cursor: not-allowed;
-        }
-        .copy-btn {
-          cursor: pointer;
-          padding: 2px;
-          border-radius: 3px;
-          transition: background-color 0.2s ease;
-        }
-        .copy-btn:hover {
-          background: rgba(255,255,255,0.2);
-        }
-        .copy-btn svg {
-          transition: fill 0.3s ease;
-          display: block;
-        }
-        .delete-btn {
-          cursor: pointer;
-          padding: 2px;
-          border-radius: 3px;
-          transition: background-color 0.2s ease;
-        }
-        .delete-btn:hover {
-          background: rgba(244, 67, 54, 0.2);
-        }
-        .delete-btn svg {
-          transition: fill 0.3s ease;
-          display: block;
-        }
-        .delete-btn:hover svg {
-          fill: #f44336 !important;
         }
         .ytls-buttons {
           display: flex;
@@ -1025,7 +996,7 @@
         .ytts-icon-btn {
           font-size: 14px;
           line-height: 1;
-          padding: 2px 6px;
+          padding: 1px 2px;
           cursor: pointer;
         }
       `;
