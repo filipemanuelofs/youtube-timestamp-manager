@@ -197,7 +197,7 @@
       } catch (error) {
         console.error(
           "[YT Timestamp Manager] Failed to save timestamps:",
-          error
+          error,
         );
       }
     },
@@ -210,7 +210,7 @@
       } catch (error) {
         console.error(
           "[YT Timestamp Manager] Failed to load timestamps:",
-          error
+          error,
         );
         return [];
       }
@@ -232,7 +232,7 @@
       } catch (error) {
         console.error(
           "[YT Timestamp Manager] Failed to get saved videos:",
-          error
+          error,
         );
       }
       return videos;
@@ -245,7 +245,7 @@
       } catch (error) {
         console.error(
           "[YT Timestamp Manager] Failed to delete timestamps:",
-          error
+          error,
         );
       }
     },
@@ -262,7 +262,7 @@
             if (data) {
               const timestamps = JSON.parse(data);
               const validTimestamps = timestamps.filter(
-                (ts) => !ts.expiration || ts.expiration > now
+                (ts) => !ts.expiration || ts.expiration > now,
               );
 
               if (validTimestamps.length !== timestamps.length) {
@@ -281,14 +281,14 @@
           utils.showNotification(
             `🧹 Cleaned ${cleanedCount} expired timestamp${
               cleanedCount > 1 ? "s" : ""
-            }!`
+            }!`,
           );
 
           // Recarrega timestamps se estiver na mesma página
           const currentVideoId = utils.getVideoId();
           if (currentVideoId) {
             const listItems = document.querySelectorAll(
-              "#ytls-pane ul li:not(.now-playing)"
+              "#ytls-pane ul li:not(.now-playing)",
             );
             listItems.forEach((item) => item.remove());
             handlers.loadSavedTimestamps();
@@ -298,9 +298,15 @@
       } catch (error) {
         console.error(
           "[YT Timestamp Manager] Failed to clean expired timestamps:",
-          error
+          error,
         );
       }
+    },
+
+    createSVGFromString(svgString) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgString, "image/svg+xml");
+      return document.importNode(doc.documentElement, true);
     },
   };
 
@@ -351,7 +357,7 @@
       const success = await utils.copyToClipboard(textToCopy);
       if (success) {
         utils.showCopyFeedback(
-          timestampElement.parentElement.querySelector(".copy-btn")
+          timestampElement.parentElement.querySelector(".copy-btn"),
         );
       }
     },
@@ -371,7 +377,7 @@
 
     async copyList() {
       const listItems = document.querySelectorAll(
-        "#ytls-pane ul li:not(.now-playing)"
+        "#ytls-pane ul li:not(.now-playing)",
       );
       let string = "";
 
@@ -386,7 +392,7 @@
       if (success) {
         const count = listItems.length;
         utils.showNotification(
-          `✓ ${count} timestamp${count > 1 ? "s" : ""} copied!`
+          `✓ ${count} timestamp${count > 1 ? "s" : ""} copied!`,
         );
       } else {
         utils.showNotification("❌ Copy failed", 1500);
@@ -404,7 +410,7 @@
       if (!videoId) return;
 
       const listItems = document.querySelectorAll(
-        "#ytls-pane ul li:not(.now-playing)"
+        "#ytls-pane ul li:not(.now-playing)",
       );
       const timestamps = [];
 
@@ -413,7 +419,7 @@
         const note = item.querySelector("input").value;
         const creation = new Date().toISOString();
         const expiration = new Date(
-          Date.now() + 30 * 24 * 60 * 60 * 1000
+          Date.now() + 30 * 24 * 60 * 60 * 1000,
         ).toISOString();
         timestamps.push({ time, note, creation, expiration });
       });
@@ -436,7 +442,7 @@
         utils.showNotification(
           `✅ ${savedTimestamps.length} saved timestamp${
             savedTimestamps.length > 1 ? "s" : ""
-          } loaded!`
+          } loaded!`,
         );
       }
 
@@ -460,7 +466,7 @@
       }
 
       const progressBar = document.querySelector(
-        ".ytp-progress-bar-container, .ytp-progress-bar"
+        ".ytp-progress-bar-container, .ytp-progress-bar",
       );
       if (!progressBar) {
         setTimeout(() => this.createMarkersContainer(), 1000);
@@ -488,7 +494,7 @@
         return;
       }
 
-      this.markersContainer.innerHTML = "";
+      this.markersContainer.replaceChildren();
 
       const video = utils.getVideo();
       if (!video || !video.duration) return;
@@ -613,7 +619,7 @@
     getCurrentTimestamps() {
       const timestamps = [];
       const listItems = document.querySelectorAll(
-        "#ytls-pane ul li:not(.now-playing)"
+        "#ytls-pane ul li:not(.now-playing)",
       );
 
       listItems.forEach((item) => {
@@ -657,16 +663,16 @@
         "input",
         utils.debounce(() => {
           handlers.saveCurrentTimestamps();
-        }, 500)
+        }, 500),
       );
 
       copyBtn.className = "copy-btn";
       copyBtn.title = "Copy timestamp";
-      copyBtn.innerHTML = ICONS.copy;
+      copyBtn.replaceChildren(createSVGFromString(ICONS.copy));
 
       deleteBtn.className = "delete-btn";
       deleteBtn.title = "Delete timestamp";
-      deleteBtn.innerHTML = ICONS.delete;
+      deleteBtn.replaceChildren(createSVGFromString(ICONS.delete));
 
       copyBtn.addEventListener("click", () => {
         handlers.copyIndividualTimestamp(a, textInput);
@@ -699,17 +705,17 @@
       header.className = "ytls-header";
 
       const settingsBtn = document.createElement("span");
-      settingsBtn.innerHTML = ICONS.settings;
+      settingsBtn.replaceChildren(createSVGFromString(ICONS.settings));
       settingsBtn.className = "settings-btn";
       settingsBtn.title = "Settings";
 
       const minimizeBtn = document.createElement("span");
-      minimizeBtn.innerHTML = ICONS.minimize;
+      minimizeBtn.replaceChildren(createSVGFromString(ICONS.minimize));
       minimizeBtn.className = "minimize-btn";
       minimizeBtn.title = "Minimize";
 
       const exitBtn = document.createElement("span");
-      exitBtn.innerHTML = ICONS.close;
+      exitBtn.replaceChildren(createSVGFromString(ICONS.close));
       exitBtn.className = "exit-btn";
       exitBtn.title = "Close";
 
@@ -720,11 +726,11 @@
 
         if (isMinimized) {
           pane.classList.remove("minimized");
-          minimizeBtn.innerHTML = ICONS.minimize;
+          minimizeBtn.replaceChildren(createSVGFromString(ICONS.minimize));
           minimizeBtn.title = "Minimize";
         } else {
           pane.classList.add("minimized");
-          minimizeBtn.innerHTML = ICONS.expand;
+          minimizeBtn.replaceChildren(createSVGFromString(ICONS.expand));
           minimizeBtn.title = "Restore";
         }
       });
@@ -1096,44 +1102,77 @@
 
       const modal = document.createElement("div");
       modal.id = "ytts-settings-modal";
-      modal.innerHTML = `
-        <div class="ytts-settings-content">
-          <div class="ytts-settings-header">
-            <h3>Settings</h3>
-            <span class="ytts-settings-close">&times;</span>
-          </div>
-          <div class="ytts-settings-body">
-            <label class="ytts-setting-item">
-              <input type="checkbox" id="auto-cleanup-expired" ${
-                ui.getAutoCleanupSetting() ? "checked" : ""
-              }>
-              <span>
-                Automatically clean expired timestamps <br>
-                <small>The expiration date is 1 month after the date the timestamp was added.</small>
-              </span>
-            </label>
-          </div>
-          <div class="ytts-settings-footer">
-            <button id="ytts-save-settings">Save</button>
-            <button id="ytts-cancel-settings">Cancel</button>
-          </div>
-        </div>
-      `;
 
+      const content = document.createElement("div");
+      content.className = "ytts-settings-content";
+
+      // Header
+      const header = document.createElement("div");
+      header.className = "ytts-settings-header";
+
+      const title = document.createElement("h3");
+      title.textContent = "Settings";
+
+      const closeBtn = document.createElement("span");
+      closeBtn.className = "ytts-settings-close";
+      closeBtn.textContent = "×";
+
+      header.appendChild(title);
+      header.appendChild(closeBtn);
+
+      // Body
+      const body = document.createElement("div");
+      body.className = "ytts-settings-body";
+
+      const label = document.createElement("label");
+      label.className = "ytts-setting-item";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = "auto-cleanup-expired";
+      checkbox.checked = ui.getAutoCleanupSetting();
+
+      const span = document.createElement("span");
+      span.append("Automatically clean expired timestamps");
+      span.appendChild(document.createElement("br"));
+
+      const small = document.createElement("small");
+      small.textContent =
+        "The expiration date is 1 month after the date the timestamp was added.";
+
+      span.appendChild(small);
+
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      body.appendChild(label);
+
+      // Footer
+      const footer = document.createElement("div");
+      footer.className = "ytts-settings-footer";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.id = "ytts-save-settings";
+      saveBtn.textContent = "Save";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.id = "ytts-cancel-settings";
+      cancelBtn.textContent = "Cancel";
+
+      footer.appendChild(saveBtn);
+      footer.appendChild(cancelBtn);
+
+      // Assemble
+      content.appendChild(header);
+      content.appendChild(body);
+      content.appendChild(footer);
+      modal.appendChild(content);
       document.body.appendChild(modal);
 
       // Event listeners
-      modal
-        .querySelector(".ytts-settings-close")
-        .addEventListener("click", () => modal.remove());
-      modal
-        .querySelector("#ytts-cancel-settings")
-        .addEventListener("click", () => modal.remove());
-      modal
-        .querySelector("#ytts-save-settings")
-        .addEventListener("click", ui.saveSettings);
+      closeBtn.addEventListener("click", () => modal.remove());
+      cancelBtn.addEventListener("click", () => modal.remove());
+      saveBtn.addEventListener("click", ui.saveSettings);
 
-      // Fechar ao clicar fora
       modal.addEventListener("click", (e) => {
         if (e.target === modal) modal.remove();
       });
@@ -1149,7 +1188,7 @@
 
     saveSettings() {
       const autoCleanup = document.querySelector(
-        "#auto-cleanup-expired"
+        "#auto-cleanup-expired",
       ).checked;
 
       try {
