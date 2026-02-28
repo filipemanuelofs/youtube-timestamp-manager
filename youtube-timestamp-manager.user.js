@@ -23,15 +23,6 @@
 (function () {
   "use strict";
 
-  const ICONS = {
-    close: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="1" x2="13" y2="13" stroke="#F2F2F2" stroke-width="2"/><line x1="13" y1="1" x2="1" y2="13" stroke="#F2F2F2" stroke-width="2"/></svg>`,
-    minimize: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="#F2F2F2" stroke-width="2"/></svg>`,
-    expand: `<svg xmlns="http://www.w3.org/2000/svg" fill="#f2f2f2" width="14" height="14" viewBox="0 0 52 52" xml:space="preserve"><path d="M48.8 2H33.3c-1 0-1.3.9-.5 1.7l4.9 4.9-9 9c-.5.5-.5 1.3 0 1.9l3.7 3.7c.5.5 1.3.5 1.9 0l9.1-9.1 4.9 4.9c.8.8 1.7.5 1.7-.5V3.1c0-.6-.6-1.1-1.2-1.1M3.5 50h15.4c1 0 1.3-1.1.5-1.9l-4.9-5 9-9.1c.5-.5.5-1.4 0-1.9l-3.7-3.7c-.5-.5-1.3-.5-1.9 0l-9 9-5-4.9C3 31.7 2 32 2 33v15.4c0 .7.8 1.6 1.5 1.6M50 48.8V33.3c0-1-.9-1.3-1.7-.5l-4.9 4.9-9-9c-.5-.5-1.3-.5-1.9 0l-3.7 3.7c-.5.5-.5 1.3 0 1.9l9.1 9.1-4.9 4.9c-.8.8-.5 1.7.5 1.7h15.4c.6 0 1.1-.6 1.1-1.2M2 3.5v15.4c0 1 1.1 1.3 1.9.5l5-4.9 9.1 9c.5.5 1.4.5 1.9 0l3.7-3.7c.5-.5.5-1.3 0-1.9l-9-9 4.9-5C20.3 3 20 2 19 2H3.6C2.9 2 2 2.8 2 3.5"/></svg>`,
-    settings: `<svg xmlns="http://www.w3.org/2000/svg" fill="#f2f2f2" width="16" height="16" viewBox="0 0 0.4 0.4" xml:space="preserve"><path d="M.22.4H.18A.02.02 0 0 1 .162.386L.144.334.096.36Q.084.366.072.356L.044.328A.02.02 0 0 1 .04.304L.064.256.012.238Q.002.233 0 .22V.18A.02.02 0 0 1 .014.162L.066.144.04.096A.02.02 0 0 1 .044.072L.072.044A.02.02 0 0 1 .096.04l.048.024.018-.052Q.166.002.18 0h.04a.02.02 0 0 1 .018.014l.018.052L.304.04a.02.02 0 0 1 .024.004l.028.028A.02.02 0 0 1 .36.096L.336.144l.052.018Q.398.166.4.18v.04a.02.02 0 0 1-.014.018L.334.256l.024.048a.02.02 0 0 1-.004.024L.326.356A.02.02 0 0 1 .302.36L.254.336.236.388C.236.394.228.4.22.4M.194.36h.012L.224.306C.228.294.248.286.258.292L.31.318.318.31.292.258C.286.246.294.228.306.224L.36.206V.194L.306.176C.294.172.286.152.292.142L.318.09.31.082.258.108C.246.114.228.106.224.094L.206.04H.194L.176.094C.172.106.152.114.142.108L.09.082.082.09l.026.052C.114.154.106.172.094.176L.04.194v.012l.054.018c.012.004.02.024.014.034L.082.31.09.318.142.292c.012-.006.03.002.034.014z"/><path d="M.24.2A.04.04 0 0 1 .2.24.04.04 0 0 1 .16.2a.04.04 0 0 1 .08 0"/></svg>`,
-    copy: `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#F2F2F2"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>`,
-    delete: `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#e62a2b"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`,
-  };
-
   let elements = {
     video: null,
     pane: null,
@@ -301,12 +292,6 @@
           error,
         );
       }
-    },
-
-    createSVGFromString(svgString) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(svgString, "image/svg+xml");
-      return document.importNode(doc.documentElement, true);
     },
   };
 
@@ -668,11 +653,11 @@
 
       copyBtn.className = "copy-btn";
       copyBtn.title = "Copy timestamp";
-      copyBtn.replaceChildren(utils.createSVGFromString(ICONS.copy));
+      copyBtn.textContent = "📋";
 
       deleteBtn.className = "delete-btn";
       deleteBtn.title = "Delete timestamp";
-      deleteBtn.replaceChildren(utils.createSVGFromString(ICONS.delete));
+      deleteBtn.textContent = "🗑";
 
       copyBtn.addEventListener("click", () => {
         handlers.copyIndividualTimestamp(a, textInput);
@@ -705,18 +690,18 @@
       header.className = "ytls-header";
 
       const settingsBtn = document.createElement("span");
-      settingsBtn.replaceChildren(utils.createSVGFromString(ICONS.settings));
-      settingsBtn.className = "settings-btn";
+      settingsBtn.textContent = "⚙️";
+      settingsBtn.classList.add("ytts-icon-btn");
       settingsBtn.title = "Settings";
 
       const minimizeBtn = document.createElement("span");
-      minimizeBtn.replaceChildren(utils.createSVGFromString(ICONS.minimize));
-      minimizeBtn.className = "minimize-btn";
+      minimizeBtn.textContent = "🔽";
+      minimizeBtn.classList.add("ytts-icon-btn");
       minimizeBtn.title = "Minimize";
 
       const exitBtn = document.createElement("span");
-      exitBtn.replaceChildren(utils.createSVGFromString(ICONS.close));
-      exitBtn.className = "exit-btn";
+      exitBtn.textContent = "❌";
+      exitBtn.classList.add("ytts-icon-btn");
       exitBtn.title = "Close";
 
       settingsBtn.addEventListener("click", ui.openSettingsModal);
@@ -726,13 +711,11 @@
 
         if (isMinimized) {
           pane.classList.remove("minimized");
-          minimizeBtn.replaceChildren(
-            utils.createSVGFromString(ICONS.minimize),
-          );
+          minimizeBtn.textContent = "🔽";
           minimizeBtn.title = "Minimize";
         } else {
           pane.classList.add("minimized");
-          minimizeBtn.replaceChildren(utils.createSVGFromString(ICONS.expand));
+          minimizeBtn.textContent = "🔼";
           minimizeBtn.title = "Restore";
         }
       });
@@ -801,21 +784,7 @@
           gap: 4px;
           margin-bottom: 5px;
         }
-        .minimize-btn,
-        .exit-btn {
-          color: white;
-          cursor: pointer;
-          font-size: 18px;
-          font-weight: bold;
-          line-height: 1;
-          padding: 2px 5px;
-          border-radius: 3px;
-          transition: background-color 0.2s ease;
-        }
-        .minimize-btn:hover,
-        .exit-btn:hover {
-          background: rgba(255,255,255,0.2);
-        }
+
         #ytls-pane.minimized ul,
         #ytls-pane.minimized .ytls-buttons {
           display: none;
@@ -1053,20 +1022,11 @@
           border-color: #81D4FA;
         }
 
-        .settings-btn {
-          color: #e3e3e3;
+        .ytts-icon-btn {
+          font-size: 14px;
+          line-height: 1;
+          padding: 2px 6px;
           cursor: pointer;
-          padding: 2px 5px;
-          border-radius: 3px;
-          transition: background-color 0.2s ease;
-        }
-
-        .settings-btn:hover {
-          background: rgba(255, 255, 255, 0.2);
-        }
-
-        .settings-btn svg {
-          display: block;
         }
       `;
 
