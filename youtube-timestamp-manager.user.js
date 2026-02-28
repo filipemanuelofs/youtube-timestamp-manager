@@ -668,11 +668,11 @@
 
       copyBtn.className = "copy-btn";
       copyBtn.title = "Copy timestamp";
-      copyBtn.replaceChildren(createSVGFromString(ICONS.copy));
+      copyBtn.replaceChildren(utils.createSVGFromString(ICONS.copy));
 
       deleteBtn.className = "delete-btn";
       deleteBtn.title = "Delete timestamp";
-      deleteBtn.replaceChildren(createSVGFromString(ICONS.delete));
+      deleteBtn.replaceChildren(utils.createSVGFromString(ICONS.delete));
 
       copyBtn.addEventListener("click", () => {
         handlers.copyIndividualTimestamp(a, textInput);
@@ -705,17 +705,17 @@
       header.className = "ytls-header";
 
       const settingsBtn = document.createElement("span");
-      settingsBtn.replaceChildren(createSVGFromString(ICONS.settings));
+      settingsBtn.replaceChildren(utils.createSVGFromString(ICONS.settings));
       settingsBtn.className = "settings-btn";
       settingsBtn.title = "Settings";
 
       const minimizeBtn = document.createElement("span");
-      minimizeBtn.replaceChildren(createSVGFromString(ICONS.minimize));
+      minimizeBtn.replaceChildren(utils.createSVGFromString(ICONS.minimize));
       minimizeBtn.className = "minimize-btn";
       minimizeBtn.title = "Minimize";
 
       const exitBtn = document.createElement("span");
-      exitBtn.replaceChildren(createSVGFromString(ICONS.close));
+      exitBtn.replaceChildren(utils.createSVGFromString(ICONS.close));
       exitBtn.className = "exit-btn";
       exitBtn.title = "Close";
 
@@ -726,11 +726,13 @@
 
         if (isMinimized) {
           pane.classList.remove("minimized");
-          minimizeBtn.replaceChildren(createSVGFromString(ICONS.minimize));
+          minimizeBtn.replaceChildren(
+            utils.createSVGFromString(ICONS.minimize),
+          );
           minimizeBtn.title = "Minimize";
         } else {
           pane.classList.add("minimized");
-          minimizeBtn.replaceChildren(createSVGFromString(ICONS.expand));
+          minimizeBtn.replaceChildren(utils.createSVGFromString(ICONS.expand));
           minimizeBtn.title = "Restore";
         }
       });
