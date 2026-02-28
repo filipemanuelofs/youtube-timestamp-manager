@@ -1,11 +1,11 @@
-## 🚀 What's New in v1.1.3
+## 🚀 What's New in v1.1.4
 
 ### Changes
-- 🔼 Bump version to v1.1.2
-- remoção da função parseFromString que também viola o CSP
+- 🔼 Bump version to v1.1.3
+- ajustes de UI
 
 ### 📦 Installation
-Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.1.3/youtube-timestamp-manager.user.js)
+Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.1.4/youtube-timestamp-manager.user.js)
 
 ### 🔧 Compatibility
 - ✅ YouTube (all versions)
