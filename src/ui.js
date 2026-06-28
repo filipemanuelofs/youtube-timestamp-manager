@@ -399,7 +399,7 @@ export const ui = {
       progressMarkers.init();
     }, 1500);
 
-    setMinimized(true);
+    setMinimized(ui.getStartMinimizedSetting());
 
     return pane;
   },
@@ -455,6 +455,22 @@ export const ui = {
     label.appendChild(span);
     body.appendChild(label);
 
+    const labelMinimized = document.createElement("label");
+    labelMinimized.className = "ytts-setting-item";
+    labelMinimized.style.marginTop = "12px";
+
+    const checkboxMinimized = document.createElement("input");
+    checkboxMinimized.type = "checkbox";
+    checkboxMinimized.id = "start-minimized";
+    checkboxMinimized.checked = ui.getStartMinimizedSetting();
+
+    const spanMinimized = document.createElement("span");
+    spanMinimized.textContent = "Start widget minimized";
+
+    labelMinimized.appendChild(checkboxMinimized);
+    labelMinimized.appendChild(spanMinimized);
+    body.appendChild(labelMinimized);
+
     const footer = document.createElement("div");
     footer.className = "ytts-settings-footer";
 
@@ -496,15 +512,26 @@ export const ui = {
     }
   },
 
+  getStartMinimizedSetting() {
+    try {
+      const val = localStorage.getItem("ytts_start_minimized");
+      return val === null ? true : val === "true";
+    } catch {
+      return true;
+    }
+  },
+
   /**
    * Persiste as configurações do modal no localStorage e fecha o modal.
    * Se a limpeza automática for ativada, executa `cleanExpired` imediatamente.
    */
   saveSettings() {
     const autoCleanup = document.querySelector("#auto-cleanup-expired").checked;
+    const startMinimized = document.querySelector("#start-minimized").checked;
 
     try {
       localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
+      localStorage.setItem("ytts_start_minimized", startMinimized.toString());
 
       if (autoCleanup) {
         handlers.cleanExpired();

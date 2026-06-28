@@ -16,6 +16,8 @@ npm test           # runs vitest against src/utils/
 
 The **committed production file** is `youtube-timestamp-manager.user.js` at the repo root — this is what gets installed by users and what the CI release workflow reads the `@version` from. The `src/` + `dist/` directory with the modular build is untracked in-progress work.
 
+**Never edit `youtube-timestamp-manager.user.js` directly.** It is build output. Always edit files under `src/`, then run `npm run build` to regenerate the root `.user.js`.
+
 `build.js` reads `@version` from the root `.user.js` and injects it into the userscript banner before bundling. `build.config.js` holds esbuild options.
 
 ## Tests

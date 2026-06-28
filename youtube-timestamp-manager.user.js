@@ -80,10 +80,17 @@
       init_time();
       progressMarkers = {
         markersContainer: null,
+        /**
+         * Inicializa os marcadores de progresso: cria o container e renderiza os pins.
+         */
         init() {
           this.createMarkersContainer();
           this.updateMarkers();
         },
+        /**
+         * Cria e injeta o container de marcadores dentro da barra de progresso do YouTube.
+         * Tenta novamente após 1 segundo se a barra ainda não estiver no DOM.
+         */
         createMarkersContainer() {
           if (this.markersContainer) {
             this.markersContainer.remove();
@@ -108,6 +115,11 @@
     `;
           progressBar.appendChild(this.markersContainer);
         },
+        /**
+         * Re-renderiza todos os pins de marcador com base nos timestamps atualmente na lista.
+         * Limpa os marcadores existentes antes de redesenhar.
+         * Inicializa o container automaticamente se ainda não existir.
+         */
         updateMarkers() {
           if (!this.markersContainer) {
             this.init();
@@ -214,6 +226,10 @@
             this.markersContainer.appendChild(markerWrapper);
           });
         },
+        /**
+         * Lê os timestamps atualmente exibidos na lista do painel e os retorna como array.
+         * @returns {Array<{time: number, note: string}>} Timestamps extraídos dos itens da lista.
+         */
         getCurrentTimestamps() {
           const timestamps = [];
           const listItems = document.querySelectorAll(
@@ -231,6 +247,9 @@
           });
           return timestamps;
         },
+        /**
+         * Remove o container de marcadores do DOM e limpa a referência interna.
+         */
         destroy() {
           if (this.markersContainer) {
             this.markersContainer.remove();
@@ -619,6 +638,13 @@
   }
 `;
       ui = {
+        /**
+         * Cria e insere um item de timestamp na lista do painel.
+         * Inclui link clicável com o tempo, campo de nota e botões de copiar/deletar.
+         * @param {number} time - Tempo em segundos do timestamp.
+         * @param {string} [note=""] - Nota inicial para o timestamp.
+         * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
+         */
         createTimestampItem(time, note = "") {
           const li = document.createElement("li");
           const a = document.createElement("a");
@@ -659,6 +685,12 @@
           list.insertBefore(li, nowPlaying);
           return textInput;
         },
+        /**
+         * Cria e injeta o painel flutuante principal no `document.body`.
+         * Configura cabeçalho, lista de timestamps, botões de ação e estilos CSS.
+         * Inicia o loop `watchTime` e carrega timestamps salvos após 1 segundo.
+         * @returns {HTMLDivElement} Elemento do painel criado.
+         */
         init() {
           const pane = document.createElement("div");
           pane.id = "ytls-pane";
@@ -739,9 +771,13 @@
           setTimeout(() => {
             progressMarkers.init();
           }, 1500);
-          setMinimized(true);
+          setMinimized(ui.getStartMinimizedSetting());
           return pane;
         },
+        /**
+         * Abre o modal de configurações caso ainda não esteja aberto.
+         * Exibe opção de limpeza automática de timestamps expirados.
+         */
         openSettingsModal() {
           if (document.querySelector("#ytts-settings-modal")) return;
           const modal = document.createElement("div");
@@ -774,6 +810,18 @@
           label.appendChild(checkbox);
           label.appendChild(span);
           body.appendChild(label);
+          const labelMinimized = document.createElement("label");
+          labelMinimized.className = "ytts-setting-item";
+          labelMinimized.style.marginTop = "12px";
+          const checkboxMinimized = document.createElement("input");
+          checkboxMinimized.type = "checkbox";
+          checkboxMinimized.id = "start-minimized";
+          checkboxMinimized.checked = ui.getStartMinimizedSetting();
+          const spanMinimized = document.createElement("span");
+          spanMinimized.textContent = "Start widget minimized";
+          labelMinimized.appendChild(checkboxMinimized);
+          labelMinimized.appendChild(spanMinimized);
+          body.appendChild(labelMinimized);
           const footer = document.createElement("div");
           footer.className = "ytts-settings-footer";
           const saveBtn = document.createElement("button");
@@ -796,6 +844,10 @@
             if (e.target === modal) modal.remove();
           });
         },
+        /**
+         * Lê a configuração de limpeza automática de timestamps expirados do localStorage.
+         * @returns {boolean} `true` se a limpeza automática estiver habilitada.
+         */
         getAutoCleanupSetting() {
           try {
             return localStorage.getItem("ytts_auto_cleanup") === "true";
@@ -803,10 +855,24 @@
             return false;
           }
         },
+        getStartMinimizedSetting() {
+          try {
+            const val = localStorage.getItem("ytts_start_minimized");
+            return val === null ? true : val === "true";
+          } catch {
+            return true;
+          }
+        },
+        /**
+         * Persiste as configurações do modal no localStorage e fecha o modal.
+         * Se a limpeza automática for ativada, executa `cleanExpired` imediatamente.
+         */
         saveSettings() {
           const autoCleanup = document.querySelector("#auto-cleanup-expired").checked;
+          const startMinimized = document.querySelector("#start-minimized").checked;
           try {
             localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
+            localStorage.setItem("ytts_start_minimized", startMinimized.toString());
             if (autoCleanup) {
               handlers.cleanExpired();
             }
@@ -834,17 +900,29 @@
       init_ui();
       init_lifecycle();
       handlers = {
+        /**
+         * Solicita confirmação ao usuário e encerra o gerenciador de timestamps caso confirmado.
+         */
         closePane() {
           if (confirm("Close timestamp tool?")) {
             cleanupTimestampManager();
           }
         },
+        /**
+         * Atualiza o texto, dataset e href de um elemento âncora de timestamp.
+         * @param {HTMLAnchorElement} stamp - Elemento âncora a atualizar.
+         * @param {number} time - Tempo em segundos.
+         */
         updateStamp(stamp, time) {
           const vid = getVideoId();
           stamp.textContent = formatTime(time);
           stamp.dataset.time = time;
           stamp.href = `https://youtu.be/${vid}?t=${time}`;
         },
+        /**
+         * Handler de clique em timestamps da lista: navega o vídeo para o tempo do timestamp clicado.
+         * @param {MouseEvent|TouchEvent} e - Evento de clique ou toque.
+         */
         async clickStamp(e) {
           if (e.target.dataset.time) {
             e.preventDefault();
@@ -854,6 +932,10 @@
             }
           }
         },
+        /**
+         * Loop via `requestAnimationFrame` que mantém o timestamp "End of Video" atualizado
+         * com a duração total do vídeo em tempo real.
+         */
         watchTime() {
           try {
             const video = getVideo();
@@ -868,6 +950,11 @@
           }
           state.nowid = requestAnimationFrame(handlers.watchTime);
         },
+        /**
+         * Copia um timestamp individual (nota + link) para a área de transferência.
+         * @param {HTMLAnchorElement} timestampElement - Elemento âncora com o link do timestamp.
+         * @param {HTMLInputElement} noteElement - Campo de texto com a nota associada.
+         */
         async copyIndividualTimestamp(timestampElement, noteElement) {
           const timestampLink = timestampElement.href;
           const note = noteElement.value;
@@ -879,6 +966,10 @@
             );
           }
         },
+        /**
+         * Adiciona um novo timestamp com o tempo atual do vídeo (menos 5 segundos) à lista.
+         * Salva automaticamente e atualiza os marcadores de progresso.
+         */
         addStamp() {
           const video = getVideo();
           if (!video) return;
@@ -888,6 +979,10 @@
           handlers.saveCurrentTimestamps();
           progressMarkers.updateMarkers();
         },
+        /**
+         * Copia todos os timestamps da lista para a área de transferência no formato `link - nota`.
+         * Exibe notificação com a quantidade copiada ou mensagem de erro.
+         */
         async copyList() {
           const listItems = document.querySelectorAll(
             "#ytls-pane ul li:not(.now-playing)"
@@ -907,11 +1002,19 @@
             showNotification("\u274C Copy failed", 1500);
           }
         },
+        /**
+         * Handler `beforeunload`: exibe diálogo de confirmação ao tentar fechar a aba.
+         * @param {BeforeUnloadEvent} e - Evento de descarregamento da página.
+         */
         warn(e) {
           e.preventDefault();
           e.returnValue = "Close timestamp tool?";
           return e.returnValue;
         },
+        /**
+         * Lê todos os timestamps atualmente na lista e os salva no localStorage.
+         * Atualiza os marcadores de progresso após salvar.
+         */
         saveCurrentTimestamps() {
           const videoId = getVideoId();
           if (!videoId) return;
@@ -931,6 +1034,11 @@
           saveTimestamps(videoId, timestamps);
           progressMarkers.updateMarkers();
         },
+        /**
+         * Carrega os timestamps salvos no localStorage para o vídeo atual e os adiciona à lista.
+         * Exibe notificação com a quantidade carregada.
+         * Se a limpeza automática estiver ativa, executa `cleanExpired` após carregar.
+         */
         loadSavedTimestamps() {
           const videoId = getVideoId();
           if (!videoId) return;
@@ -947,6 +1055,10 @@
             handlers.cleanExpired();
           }
         },
+        /**
+         * Remove timestamps expirados do localStorage e atualiza a lista e os marcadores
+         * caso o vídeo atual seja um dos afetados. Exibe notificação com o total removido.
+         */
         cleanExpired() {
           const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
           if (cleanedCount > 0) {
