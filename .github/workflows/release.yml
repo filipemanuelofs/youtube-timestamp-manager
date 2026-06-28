@@ -24,7 +24,6 @@ jobs:
   create-release:
     permissions:
       contents: write
-      pull-requests: write
     name: Create Release
     runs-on: ubuntu-latest
 
@@ -34,11 +33,6 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
 
       - name: Extract current version from userscript
         id: current-version
@@ -51,15 +45,11 @@ jobs:
         id: new-version
         run: |
           current="${{ steps.current-version.outputs.current_version }}"
-
-          # Parse version components
           IFS='.' read -r major minor patch <<< "$current"
 
-          # Determine version bump type
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             bump_type="${{ github.event.inputs.version_type }}"
           else
-            # Auto-detect based on commit message
             commit_msg="${{ github.event.head_commit.message }}"
             if [[ "$commit_msg" =~ ^(feat|feature)(\(.+\))?!: ]] || [[ "$commit_msg" =~ BREAKING.CHANGE ]]; then
               bump_type="major"
@@ -70,17 +60,10 @@ jobs:
             fi
           fi
 
-          # Calculate new version
           case $bump_type in
-            major)
-              new_version="$((major + 1)).0.0"
-              ;;
-            minor)
-              new_version="$major.$((minor + 1)).0"
-              ;;
-            patch)
-              new_version="$major.$minor.$((patch + 1))"
-              ;;
+            major) new_version="$((major + 1)).0.0" ;;
+            minor) new_version="$major.$((minor + 1)).0" ;;
+            patch) new_version="$major.$minor.$((patch + 1))" ;;
           esac
 
           echo "bump_type=$bump_type" >> $GITHUB_OUTPUT
@@ -90,16 +73,10 @@ jobs:
       - name: Update version in userscript
         run: |
           new_version="${{ steps.new-version.outputs.new_version }}"
-
-          # Update version in userscript file
           sed -i "s/@version\s\+[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $new_version/" youtube-timestamp-manager.user.js
-
-          # Update README badges if they exist
           if [ -f "README.md" ]; then
             sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$new_version-blue/" README.md
           fi
-
-          echo "Updated version to $new_version"
 
       - name: Set up Git user
         run: |
@@ -107,18 +84,14 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Generate release notes
-        id: release-notes
         run: |
-          # Get commits since last tag
           last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-
           if [ -z "$last_tag" ]; then
             commits=$(git log --pretty=format:"- %s" --reverse)
           else
             commits=$(git log ${last_tag}..HEAD --pretty=format:"- %s" --reverse)
           fi
 
-          # Create release notes
           cat > release_notes.md << EOF
           ## 🚀 What's New in v${{ steps.new-version.outputs.new_version }}
 
@@ -131,7 +104,7 @@ jobs:
           ### 🔧 Compatibility
           - ✅ YouTube (all versions)
           - ✅ YouTube Live
-          - ✅ YouTube Shorts  
+          - ✅ YouTube Shorts
           - ✅ YouTube Mobile
           - ✅ YouTube Music
 
@@ -140,37 +113,22 @@ jobs:
           - Userscript manager (Violentmonkey, Tampermonkey, etc.)
           EOF
 
-          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-          cat release_notes.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Commit version bump
         run: |
-          git add .
+          git add youtube-timestamp-manager.user.js README.md
           git commit -m "🔼 Bump version to v${{ steps.new-version.outputs.new_version }}"
           git push origin main
 
       - name: Create Release
         id: create-release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: "v${{ steps.new-version.outputs.new_version }}"
-          release_name: "YouTube Timestamp Manager v${{ steps.new-version.outputs.new_version }}"
-          body: ${{ steps.release-notes.outputs.release_notes }}
-          draft: false
-          prerelease: false
-
-      - name: Upload userscript to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./youtube-timestamp-manager.user.js
-          asset_name: youtube-timestamp-manager.user.js
-          asset_content_type: application/javascript
+        run: |
+          release_url=$(gh release create "v${{ steps.new-version.outputs.new_version }}" \
+            --title "YouTube Timestamp Manager v${{ steps.new-version.outputs.new_version }}" \
+            --notes-file release_notes.md \
+            ./youtube-timestamp-manager.user.js)
+          echo "release_url=$release_url" >> $GITHUB_OUTPUT
 
       - name: Create success summary
         run: |
@@ -178,7 +136,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** v${{ steps.new-version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Bump Type:** ${{ steps.new-version.outputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Release URL:** ${{ steps.create-release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** ${{ steps.create-release.outputs.release_url }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Direct Install Link" >> $GITHUB_STEP_SUMMARY
-          echo "[youtube-timestamp-manager.user.js](${{ steps.create-release.outputs.browser_download_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "[youtube-timestamp-manager.user.js](https://github.com/${{ github.repository }}/releases/download/v${{ steps.new-version.outputs.new_version }}/youtube-timestamp-manager.user.js)" >> $GITHUB_STEP_SUMMARY

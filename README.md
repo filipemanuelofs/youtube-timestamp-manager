@@ -98,21 +98,45 @@ The userscript works automatically without requiring configuration. All preferen
 
 ## 🔧 Development
 
-### Code Structure
+### How the project is organized
 
-```javascript
-// Modular architecture organized in:
-├── utils/          // Utilities and helpers
-├── handlers/       // Event handlers
-├── ui/             // Interface creation
-└── state/          // State management
+The main file users install is `youtube-timestamp-manager.user.js` at the root. It's a single self-contained file that runs directly in the browser — no server, no backend.
+
+Inside `src/` there's a modular version of the same code, split into smaller files to make development easier. Running `npm run build` bundles everything back into one file in `dist/`.
+
+```
+youtube-timestamp-manager.user.js   ← what users install (single file)
+
+src/
+├── index.js            ← starting point: detects when you open/leave a YouTube video
+├── state.js            ← keeps track of the current video and panel reference
+├── lifecycle.js        ← creates or removes the panel when navigating between pages
+├── ui.js               ← builds all the visible elements (panel, buttons, list)
+├── handlers.js         ← responds to user actions (add, copy, delete timestamp)
+├── progressMarkers.js  ← places clickable markers on the YouTube progress bar
+└── utils/
+    ├── time.js         ← converts seconds to readable time (e.g. 1:23:45)
+    ├── clipboard.js    ← handles copying text to clipboard
+    ├── storage.js      ← saves and loads timestamps in the browser (localStorage)
+    ├── notification.js ← shows brief success/error messages on screen
+    ├── debounce.js     ← prevents actions from firing too many times at once
+    └── video.js        ← finds the video element and reads the current video ID
+```
+
+**How they connect:** `index.js` starts everything. When you open a YouTube video, it calls `lifecycle.js` to mount the panel. `ui.js` builds the panel UI and wires up buttons to `handlers.js`. When you add a timestamp, `handlers.js` saves it via `storage.js` and tells `progressMarkers.js` to update the markers on the progress bar. When you leave the video, `lifecycle.js` removes everything and clears state.
+
+### Building
+
+```bash
+npm install       # install esbuild (only dev dependency)
+npm run build     # bundles src/ → dist/youtube-timestamp-manager.user.js
 ```
 
 ### Contributing
 
 1. Fork the repository
 2. Create a branch for your feature (`git checkout -b feature/new-feature`)
-3. Commit your changes (`git commit -am 'Add new feature'`)
+3. Commit your changes (`git commit -am 'feat: describe the change'`)
 4. Push to the branch (`git push origin feature/new-feature`)
 5. Open a Pull Request
 
