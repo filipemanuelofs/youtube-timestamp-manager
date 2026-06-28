@@ -1,11 +1,11 @@
-## 🚀 What's New in v1.1.4
+## 🚀 What's New in v1.1.5
 
 ### Changes
-- 🔼 Bump version to v1.1.3
-- ajustes de UI
+- 🔼 Bump version to v1.1.4
+- (quase) feature: início do widget já minimizado
 
 ### 📦 Installation
-Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.1.4/youtube-timestamp-manager.user.js)
+Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/filipemanuelofs/youtube-timestamp-manager/releases/download/v1.1.5/youtube-timestamp-manager.user.js)
 
 ### 🔧 Compatibility
 - ✅ YouTube (all versions)
