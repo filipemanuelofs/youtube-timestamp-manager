@@ -12,7 +12,7 @@ if (document.readyState === "loading") {
 }
 
 let lastUrl = location.href;
-new MutationObserver(() => {
+const onNavigate = () => {
   const url = location.href;
   if (url !== lastUrl) {
     lastUrl = url;
@@ -25,14 +25,18 @@ new MutationObserver(() => {
       }
     }, 100);
   }
-}).observe(document, { subtree: true, childList: true });
+};
 
-window.addEventListener("popstate", () => {
-  setTimeout(() => {
-    if (shouldShowTimestampManager()) {
-      initTimestampManager();
-    } else {
-      cleanupTimestampManager();
-    }
-  }, 100);
-});
+const origPushState = history.pushState.bind(history);
+history.pushState = function (...args) {
+  origPushState(...args);
+  onNavigate();
+};
+
+const origReplaceState = history.replaceState.bind(history);
+history.replaceState = function (...args) {
+  origReplaceState(...args);
+  onNavigate();
+};
+
+window.addEventListener("popstate", onNavigate);

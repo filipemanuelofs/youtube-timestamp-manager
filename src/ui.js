@@ -237,8 +237,11 @@ export const ui = {
    * @param {string} [note=""] - Nota inicial para o timestamp.
    * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
    */
-  createTimestampItem(time, note = "") {
+  createTimestampItem(time, note = "", creation = null, expiration = null) {
+    const now = new Date();
     const li = document.createElement("li");
+    li.dataset.creation = creation || now.toISOString();
+    li.dataset.expiration = expiration || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const a = document.createElement("a");
     const textInput = document.createElement("input");
     const copyBtn = document.createElement("span");
@@ -378,7 +381,7 @@ export const ui = {
     list.addEventListener("click", handlers.clickStamp);
     list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
 
-    window.addEventListener("unload", handlers.warn);
+    window.addEventListener("beforeunload", handlers.warn);
 
     pane.appendChild(header);
     pane.appendChild(list);

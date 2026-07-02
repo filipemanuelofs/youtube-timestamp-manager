@@ -151,10 +151,8 @@ export const handlers = {
     listItems.forEach((item) => {
       const time = parseInt(item.querySelector("a").dataset.time);
       const note = item.querySelector("input").value;
-      const creation = new Date().toISOString();
-      const expiration = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000,
-      ).toISOString();
+      const creation = item.dataset.creation;
+      const expiration = item.dataset.expiration;
       timestamps.push({ time, note, creation, expiration });
     });
 
@@ -172,8 +170,8 @@ export const handlers = {
     if (!videoId) return;
 
     const savedTimestamps = loadTimestamps(videoId);
-    savedTimestamps.forEach(({ time, note }) => {
-      ui.createTimestampItem(time, note);
+    savedTimestamps.forEach(({ time, note, creation, expiration }) => {
+      ui.createTimestampItem(time, note, creation, expiration);
     });
 
     if (savedTimestamps.length > 0) {

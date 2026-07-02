@@ -48,15 +48,18 @@ export function cleanupTimestampManager() {
 export function initTimestampManager() {
   cleanupTimestampManager();
 
-  const checkVideo = () => {
-    const video = document.querySelector("video");
-    if (video && shouldShowTimestampManager()) {
-      ui.init();
-      setTimeout(() => progressMarkers.init(), 1500);
-    } else if (shouldShowTimestampManager()) {
-      setTimeout(checkVideo, 500);
-    }
-  };
+  if (!shouldShowTimestampManager()) return;
 
-  setTimeout(checkVideo, 100);
+  if (document.querySelector("video")) {
+    ui.init();
+    return;
+  }
+
+  const observer = new MutationObserver((_, obs) => {
+    if (document.querySelector("video") && shouldShowTimestampManager()) {
+      obs.disconnect();
+      ui.init();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }

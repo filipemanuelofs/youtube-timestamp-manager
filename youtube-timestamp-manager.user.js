@@ -80,6 +80,7 @@
       init_time();
       progressMarkers = {
         markersContainer: null,
+        _lastKey: null,
         /**
          * Inicializa os marcadores de progresso: cria o container e renderiza os pins.
          */
@@ -125,11 +126,14 @@
             this.init();
             return;
           }
-          this.markersContainer.replaceChildren();
           const video = getVideo();
           if (!video || !video.duration) return;
-          const videoDuration = video.duration;
           const timestamps = this.getCurrentTimestamps();
+          const key = JSON.stringify(timestamps);
+          if (key === this._lastKey) return;
+          this._lastKey = key;
+          this.markersContainer.replaceChildren();
+          const videoDuration = video.duration;
           timestamps.forEach((timestamp) => {
             const markerWrapper = document.createElement("div");
             const marker = document.createElement("div");
@@ -255,6 +259,7 @@
             this.markersContainer.remove();
             this.markersContainer = null;
           }
+          this._lastKey = null;
         }
       };
     }
@@ -645,8 +650,11 @@
          * @param {string} [note=""] - Nota inicial para o timestamp.
          * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
          */
-        createTimestampItem(time, note = "") {
+        createTimestampItem(time, note = "", creation = null, expiration = null) {
+          const now = /* @__PURE__ */ new Date();
           const li = document.createElement("li");
+          li.dataset.creation = creation || now.toISOString();
+          li.dataset.expiration = expiration || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3).toISOString();
           const a = document.createElement("a");
           const textInput = document.createElement("input");
           const copyBtn = document.createElement("span");
@@ -756,7 +764,7 @@
           style.textContent = STYLES;
           list.addEventListener("click", handlers.clickStamp);
           list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
-          window.addEventListener("unload", handlers.warn);
+          window.addEventListener("beforeunload", handlers.warn);
           pane.appendChild(header);
           pane.appendChild(list);
           pane.appendChild(box);
@@ -1025,10 +1033,8 @@
           listItems.forEach((item) => {
             const time = parseInt(item.querySelector("a").dataset.time);
             const note = item.querySelector("input").value;
-            const creation = (/* @__PURE__ */ new Date()).toISOString();
-            const expiration = new Date(
-              Date.now() + 30 * 24 * 60 * 60 * 1e3
-            ).toISOString();
+            const creation = item.dataset.creation;
+            const expiration = item.dataset.expiration;
             timestamps.push({ time, note, creation, expiration });
           });
           saveTimestamps(videoId, timestamps);
@@ -1043,8 +1049,8 @@
           const videoId = getVideoId();
           if (!videoId) return;
           const savedTimestamps = loadTimestamps(videoId);
-          savedTimestamps.forEach(({ time, note }) => {
-            ui.createTimestampItem(time, note);
+          savedTimestamps.forEach(({ time, note, creation, expiration }) => {
+            ui.createTimestampItem(time, note, creation, expiration);
           });
           if (savedTimestamps.length > 0) {
             showNotification(
@@ -1098,16 +1104,18 @@
   }
   function initTimestampManager() {
     cleanupTimestampManager();
-    const checkVideo = () => {
-      const video = document.querySelector("video");
-      if (video && shouldShowTimestampManager()) {
+    if (!shouldShowTimestampManager()) return;
+    if (document.querySelector("video")) {
+      ui.init();
+      return;
+    }
+    const observer = new MutationObserver((_, obs) => {
+      if (document.querySelector("video") && shouldShowTimestampManager()) {
+        obs.disconnect();
         ui.init();
-        setTimeout(() => progressMarkers.init(), 1500);
-      } else if (shouldShowTimestampManager()) {
-        setTimeout(checkVideo, 500);
       }
-    };
-    setTimeout(checkVideo, 100);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
   }
   var init_lifecycle = __esm({
     "src/lifecycle.js"() {
@@ -1129,7 +1137,7 @@
         initTimestampManager();
       }
       var lastUrl = location.href;
-      new MutationObserver(() => {
+      var onNavigate = () => {
         const url = location.href;
         if (url !== lastUrl) {
           lastUrl = url;
@@ -1142,16 +1150,18 @@
             }
           }, 100);
         }
-      }).observe(document, { subtree: true, childList: true });
-      window.addEventListener("popstate", () => {
-        setTimeout(() => {
-          if (shouldShowTimestampManager()) {
-            initTimestampManager();
-          } else {
-            cleanupTimestampManager();
-          }
-        }, 100);
-      });
+      };
+      var origPushState = history.pushState.bind(history);
+      history.pushState = function(...args) {
+        origPushState(...args);
+        onNavigate();
+      };
+      var origReplaceState = history.replaceState.bind(history);
+      history.replaceState = function(...args) {
+        origReplaceState(...args);
+        onNavigate();
+      };
+      window.addEventListener("popstate", onNavigate);
     }
   });
   require_index();

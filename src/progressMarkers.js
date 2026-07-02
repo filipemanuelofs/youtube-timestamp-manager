@@ -3,6 +3,7 @@ import { formatTime } from "./utils/time.js";
 
 export const progressMarkers = {
   markersContainer: null,
+  _lastKey: null,
 
   /**
    * Inicializa os marcadores de progresso: cria o container e renderiza os pins.
@@ -55,13 +56,17 @@ export const progressMarkers = {
       return;
     }
 
-    this.markersContainer.replaceChildren();
-
     const video = getVideo();
     if (!video || !video.duration) return;
 
-    const videoDuration = video.duration;
     const timestamps = this.getCurrentTimestamps();
+    const key = JSON.stringify(timestamps);
+    if (key === this._lastKey) return;
+    this._lastKey = key;
+
+    this.markersContainer.replaceChildren();
+
+    const videoDuration = video.duration;
 
     timestamps.forEach((timestamp) => {
       const markerWrapper = document.createElement("div");
@@ -205,5 +210,6 @@ export const progressMarkers = {
       this.markersContainer.remove();
       this.markersContainer = null;
     }
+    this._lastKey = null;
   },
 };
