@@ -42,5 +42,6 @@ esbuild
     outfile: "youtube-timestamp-manager.user.js",
     format: "iife",
     banner: { js: BANNER },
+    define: { __VERSION__: JSON.stringify(version) },
   })
   .catch(() => process.exit(1));

@@ -213,6 +213,12 @@ const STYLES = `
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.5);
   }
+  .ytts-settings-version {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 11px;
+    margin-right: auto;
+    align-self: center;
+  }
   #ytts-save-settings {
     background: #4FC3F7;
     border-color: #4FC3F7;
@@ -477,6 +483,10 @@ export const ui = {
     const footer = document.createElement("div");
     footer.className = "ytts-settings-footer";
 
+    const versionEl = document.createElement("span");
+    versionEl.className = "ytts-settings-version";
+    versionEl.textContent = `v${__VERSION__}`;
+
     const saveBtn = document.createElement("button");
     saveBtn.id = "ytts-save-settings";
     saveBtn.textContent = "Save";
@@ -485,6 +495,7 @@ export const ui = {
     cancelBtn.id = "ytts-cancel-settings";
     cancelBtn.textContent = "Cancel";
 
+    footer.appendChild(versionEl);
     footer.appendChild(saveBtn);
     footer.appendChild(cancelBtn);
 
