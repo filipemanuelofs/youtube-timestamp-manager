@@ -30,6 +30,42 @@ export function loadTimestamps(videoId) {
 }
 
 /**
+ * Retorna todos os vídeos que possuem timestamps salvos no localStorage.
+ * Itera sobre todas as chaves com prefixo `ytts_` e ignora vídeos com listas vazias.
+ * @returns {Array<{videoId: string, timestamps: Array}>} Lista de vídeos com seus timestamps.
+ */
+export function getAllSavedVideos() {
+  const videos = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(PREFIX)) {
+        const videoId = key.replace(PREFIX, "");
+        const timestamps = loadTimestamps(videoId);
+        if (timestamps.length > 0) {
+          videos.push({ videoId, timestamps });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[YT Timestamp Manager] Failed to get saved videos:", error);
+  }
+  return videos;
+}
+
+/**
+ * Remove todos os timestamps de um vídeo do localStorage.
+ * @param {string} videoId - ID do vídeo a remover.
+ */
+export function deleteVideoTimestamps(videoId) {
+  try {
+    localStorage.removeItem(`${PREFIX}${videoId}`);
+  } catch (error) {
+    console.error("[YT Timestamp Manager] Failed to delete timestamps:", error);
+  }
+}
+
+/**
  * Remove timestamps expirados de todos os vídeos no localStorage.
  * Um timestamp é considerado expirado quando `expiration < now`.
  * Vídeos que ficam sem timestamps válidos têm sua chave removida completamente.
