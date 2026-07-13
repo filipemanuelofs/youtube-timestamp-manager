@@ -18,7 +18,7 @@ The **committed production file** is `youtube-timestamp-manager.user.js` at the 
 
 **Never edit `youtube-timestamp-manager.user.js` directly.** It is build output. Always edit files under `src/`, then run `npm run build` to regenerate the root `.user.js`.
 
-`build.js` reads `@version` from the root `.user.js`, injects it into the userscript banner, and defines a global `__VERSION__` (via esbuild's `define`) that `src/ui.js` uses to render the version number in the settings modal. `build.config.js` currently exists but is empty/unused — esbuild options live inline in `build.js`.
+`build.js` reads `@version` from the root `.user.js` and injects it into the userscript banner before bundling. `build.config.js` holds esbuild options.
 
 ## Tests
 
@@ -48,7 +48,7 @@ The `@version` field in the userscript header is the single source of truth for 
 | File | Role |
 |---|---|
 | `youtube-timestamp-manager.user.js` | Monolithic IIFE. Production. What users install. |
-| `src/` | Modular source, tracked in git. Bundled into `dist/` (gitignored) via esbuild. Not read by the CI release workflow. |
+| `src/` | Modular source. Bundled into `dist/` via esbuild. In-progress, untracked by CI. |
 
 The monolithic file mirrors the `src/` module structure as plain-object namespaces inside the IIFE.
 
@@ -56,10 +56,10 @@ The monolithic file mirrors the `src/` module structure as plain-object namespac
 
 | File | Role |
 |---|---|
-| `index.js` | Entry point. Runs on `DOMContentLoaded` (or immediately if already loaded), then patches `history.pushState`/`replaceState` and listens for `popstate` to detect SPA navigation. |
+| `index.js` | Entry point. DOMContentLoaded + `MutationObserver` + `popstate` for SPA navigation detection. |
 | `state.js` | Shared mutable refs: `elements` (`video`, `pane`) and `state` (`videoId`, `nowid` rAF handle). No imports. |
-| `lifecycle.js` | `shouldShowTimestampManager()` (URL check). `initTimestampManager()` calls `ui.init()` immediately if `<video>` is already present, otherwise waits on a `MutationObserver` scoped to `document.body`. `cleanupTimestampManager()` cancels rAF, removes pane, destroys progress markers, clears state. |
-| `ui.js` | Creates all DOM elements (pane, header, settings modal incl. version number + GitHub link, timestamp rows) and injects scoped `<style>`. Calls `progressMarkers.init()`. |
+| `lifecycle.js` | `shouldShowTimestampManager()` (URL check). `initTimestampManager()` polls for `<video>`, calls `ui.init()` + `progressMarkers.init()`. `cleanupTimestampManager()` cancels rAF, removes pane, clears state. |
+| `ui.js` | Creates all DOM elements (pane, header, settings modal, timestamp rows) and injects scoped `<style>`. |
 | `handlers.js` | Add/save/copy/delete timestamp actions. `watchTime()` rAF loop keeps "End of Video" stamp live. Imports `ui` and `lifecycle` inside functions to avoid circular reference at module level. |
 | `progressMarkers.js` | Injects clickable pin elements into YouTube's progress bar. Re-renders when timestamps change. |
 | `utils/time.js` | `formatTime(seconds)` → `HH:MM:SS` string. |
@@ -74,11 +74,10 @@ The monolithic file mirrors the `src/` module structure as plain-object namespac
 Timestamps stored per-video in `localStorage`:
 - Key: `ytts_${videoId}` — array of `{time, note, creation, expiration}` objects
 - `expiration` is set to 30 days after `creation`; setting `ytts_auto_cleanup` controls whether expired entries are pruned on load
-- `ytts_start_minimized` (boolean string) controls whether the panel opens minimized
 
 ### SPA navigation
 
-YouTube is a SPA. Navigation is detected by patching `history.pushState`/`replaceState` (both call through to the original then run the same check) plus a `popstate` listener. On a URL change, after a short timeout, `initTimestampManager()` runs if the new URL is a video page, else `cleanupTimestampManager()` runs. `initTimestampManager()` itself uses a `MutationObserver` on `document.body` to wait for `<video>` to appear rather than polling.
+YouTube is a SPA. Navigation is detected via a `MutationObserver` on `document` plus a `popstate` listener. Both call `initTimestampManager()` (or `cleanupTimestampManager()` if leaving a video page) after a short timeout.
 
 ### CSP constraint
 
