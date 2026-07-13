@@ -861,7 +861,7 @@
           const versionEl = document.createElement("div");
           versionEl.className = "ytts-settings-version";
           const versionText = document.createElement("span");
-          versionText.textContent = `v${"1.2.1"}`;
+          versionText.textContent = `v${"1.3.0"}`;
           const separator = document.createElement("span");
           separator.className = "ytts-settings-version-separator";
           separator.textContent = "|";
@@ -1189,11 +1189,10 @@
       } else {
         initTimestampManager();
       }
-      var lastUrl = location.href;
       var onNavigate = () => {
         const url = location.href;
-        if (url !== lastUrl) {
-          lastUrl = url;
+        if (url !== state.currentUrl) {
+          state.currentUrl = url;
           state.videoId = null;
           setTimeout(() => {
             if (shouldShowTimestampManager()) {

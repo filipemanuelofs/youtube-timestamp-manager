@@ -11,11 +11,10 @@ if (document.readyState === "loading") {
   initTimestampManager();
 }
 
-let lastUrl = location.href;
 const onNavigate = () => {
   const url = location.href;
-  if (url !== lastUrl) {
-    lastUrl = url;
+  if (url !== state.currentUrl) {
+    state.currentUrl = url;
     state.videoId = null;
     setTimeout(() => {
       if (shouldShowTimestampManager()) {

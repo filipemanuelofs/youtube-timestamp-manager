@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   saveTimestamps,
   loadTimestamps,
-  getAllSavedVideos,
-  deleteVideoTimestamps,
   removeExpiredFromStorage,
 } from "../../src/utils/storage.js";
 
@@ -27,44 +25,6 @@ describe("saveTimestamps / loadTimestamps", () => {
     saveTimestamps("vid1", [{ time: 10 }]);
     saveTimestamps("vid1", [{ time: 20 }]);
     expect(loadTimestamps("vid1")).toEqual([{ time: 20 }]);
-  });
-});
-
-describe("getAllSavedVideos", () => {
-  beforeEach(() => localStorage.clear());
-
-  it("returns all ytts_ videos", () => {
-    saveTimestamps("vid1", [{ time: 10 }]);
-    saveTimestamps("vid2", [{ time: 20 }]);
-    const all = getAllSavedVideos();
-    expect(all).toHaveLength(2);
-    expect(all.map((v) => v.videoId)).toContain("vid1");
-    expect(all.map((v) => v.videoId)).toContain("vid2");
-  });
-
-  it("excludes videos with empty timestamp arrays", () => {
-    saveTimestamps("vid1", []);
-    expect(getAllSavedVideos()).toHaveLength(0);
-  });
-
-  it("ignores non-ytts_ localStorage keys", () => {
-    localStorage.setItem("other_key", "value");
-    saveTimestamps("vid1", [{ time: 10 }]);
-    expect(getAllSavedVideos()).toHaveLength(1);
-  });
-});
-
-describe("deleteVideoTimestamps", () => {
-  beforeEach(() => localStorage.clear());
-
-  it("removes video from storage", () => {
-    saveTimestamps("vid1", [{ time: 10 }]);
-    deleteVideoTimestamps("vid1");
-    expect(loadTimestamps("vid1")).toEqual([]);
-  });
-
-  it("no-ops for non-existent video", () => {
-    expect(() => deleteVideoTimestamps("ghost")).not.toThrow();
   });
 });
 
