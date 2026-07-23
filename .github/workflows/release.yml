@@ -20,6 +20,10 @@ on:
           - minor
           - major
 
+concurrency:
+  group: release-create-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   create-release:
     permissions:
@@ -116,18 +120,32 @@ jobs:
       - name: Commit version bump
         run: |
           git add youtube-timestamp-manager.user.js README.md
-          git commit -m "🔼 Bump version to v${{ steps.new-version.outputs.new_version }}"
-          git push origin main
+          if git diff --cached --quiet; then
+            echo "No changes to commit, skipping."
+          else
+            git commit -m "🔼 Bump version to v${{ steps.new-version.outputs.new_version }}"
+            git push origin main
+          fi
 
       - name: Create Release
         id: create-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          release_url=$(gh release create "v${{ steps.new-version.outputs.new_version }}" \
-            --title "YouTube Timestamp Manager v${{ steps.new-version.outputs.new_version }}" \
-            --notes-file release_notes.md \
-            ./youtube-timestamp-manager.user.js)
+          tag="v${{ steps.new-version.outputs.new_version }}"
+          title="YouTube Timestamp Manager ${tag}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists, updating it instead."
+            gh release edit "$tag" --title "$title" --notes-file release_notes.md
+            gh release upload "$tag" ./youtube-timestamp-manager.user.js --clobber
+            release_url=$(gh release view "$tag" --json url -q .url)
+          else
+            release_url=$(gh release create "$tag" \
+              --title "$title" \
+              --notes-file release_notes.md \
+              ./youtube-timestamp-manager.user.js)
+          fi
           echo "release_url=$release_url" >> $GITHUB_OUTPUT
 
       - name: Create success summary
