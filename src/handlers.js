@@ -126,8 +126,9 @@ export const handlers = {
   },
 
   /**
-   * Handler `beforeunload`: exibe diálogo de confirmação ao tentar fechar a aba.
-   * @param {BeforeUnloadEvent} e - Evento de descarregamento da página.
+   * Handler `unload`: sem efeito no browser (evento não suporta diálogo de confirmação).
+   * Mantido em `unload` (não `beforeunload`) de propósito para não exibir popup ao fechar a aba.
+   * @param {Event} e - Evento de descarregamento da página.
    */
   warn(e) {
     e.preventDefault();

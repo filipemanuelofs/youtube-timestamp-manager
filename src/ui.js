@@ -407,7 +407,7 @@ export const ui = {
     list.addEventListener("click", handlers.clickStamp);
     list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
 
-    window.addEventListener("beforeunload", handlers.warn);
+    window.addEventListener("unload", handlers.warn);
 
     pane.appendChild(header);
     pane.appendChild(list);

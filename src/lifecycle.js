@@ -35,7 +35,7 @@ export function cleanupTimestampManager() {
 
   progressMarkers.destroy();
 
-  window.removeEventListener("beforeunload", handlers.warn);
+  window.removeEventListener("unload", handlers.warn);
   elements.video = null;
   state.videoId = null;
 }

@@ -790,7 +790,7 @@
           style.textContent = STYLES;
           list.addEventListener("click", handlers.clickStamp);
           list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
-          window.addEventListener("beforeunload", handlers.warn);
+          window.addEventListener("unload", handlers.warn);
           pane.appendChild(header);
           pane.appendChild(list);
           pane.appendChild(box);
@@ -861,7 +861,7 @@
           const versionEl = document.createElement("div");
           versionEl.className = "ytts-settings-version";
           const versionText = document.createElement("span");
-          versionText.textContent = `v${"1.2.1"}`;
+          versionText.textContent = `v${"1.4.1"}`;
           const separator = document.createElement("span");
           separator.className = "ytts-settings-version-separator";
           separator.textContent = "|";
@@ -1064,8 +1064,9 @@
           }
         },
         /**
-         * Handler `beforeunload`: exibe diálogo de confirmação ao tentar fechar a aba.
-         * @param {BeforeUnloadEvent} e - Evento de descarregamento da página.
+         * Handler `unload`: sem efeito no browser (evento não suporta diálogo de confirmação).
+         * Mantido em `unload` (não `beforeunload`) de propósito para não exibir popup ao fechar a aba.
+         * @param {Event} e - Evento de descarregamento da página.
          */
         warn(e) {
           e.preventDefault();
@@ -1151,7 +1152,7 @@
       elements.pane = null;
     }
     progressMarkers.destroy();
-    window.removeEventListener("beforeunload", handlers.warn);
+    window.removeEventListener("unload", handlers.warn);
     elements.video = null;
     state.videoId = null;
   }
