@@ -1216,6 +1216,7 @@
         onNavigate();
       };
       window.addEventListener("popstate", onNavigate);
+      window.addEventListener("yt-navigate-finish", onNavigate);
     }
   });
   require_index();
