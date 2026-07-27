@@ -41,3 +41,4 @@ history.replaceState = function (...args) {
 
 window.addEventListener("popstate", onNavigate);
 window.addEventListener("yt-navigate-finish", onNavigate);
+document.addEventListener("yt-navigate-finish", onNavigate);
