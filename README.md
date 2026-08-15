@@ -13,7 +13,10 @@
 - 📝 **Add timestamps** with custom notes
 - 🔗 **Copy individual links** with specific timestamp
 - 📋 **Copy complete list** of all timestamps
-- 🗑️ **Delete unwanted timestamps**
+- ⛔ **Delete unwanted timestamps** one by one
+- ☑️ **Bulk delete** - select multiple timestamps and remove them in one go
+- 📍 **Progress bar markers** - every timestamp gets a clickable pin on the video scrubber
+- 💾 **Automatic saving** - timestamps persist per video and expire after 30 days
 - 🔽 **Minimize panel** to avoid interfering with viewing experience
 - ⚡ **Quick navigation** - click timestamp to jump to that moment
 - 🎬 **Full support** - YouTube, Lives, Shorts, Mobile and YouTube Music
@@ -46,18 +49,24 @@
 
 ### Panel Interface
 
-The panel automatically appears in the bottom-left corner when you open a YouTube video:
+The panel automatically appears in the bottom-left corner when you open a YouTube video. It starts minimized by default — click 🔼 to expand it, or turn the behaviour off in the settings.
 
 ### Panel Controls
 
-| Button/Icon       | Function                             |
-| ----------------- | ------------------------------------ |
-| **−**             | Minimize/restore panel               |
-| **×**             | Close panel (with confirmation)      |
-| **📋**            | Copy individual timestamp            |
-| **🗑️**            | Delete timestamp (with confirmation) |
-| **Add Timestamp** | Add current video timestamp          |
-| **Copy List**     | Copy all timestamps                  |
+| Button/Icon             | Function                                           |
+| ----------------------- | -------------------------------------------------- |
+| **⚙️**                  | Open settings                                      |
+| **🔽 / 🔼**             | Minimize/restore panel                             |
+| **❌**                  | Close panel (with confirmation)                    |
+| **📋**                  | Copy individual timestamp                          |
+| **⛔**                  | Delete timestamp (with confirmation)               |
+| **Add Timestamp**       | Add current video timestamp                        |
+| **Copy Timestamps**     | Copy all timestamps                                |
+| **☑️ (per row)**        | Select a timestamp for bulk delete                 |
+| **☑️ (in the header)**  | Select or clear every timestamp at once            |
+| **Delete Selected (N)** | Delete the selected timestamps (with confirmation) |
+
+The selection controls only show up once the list has more than 3 timestamps — below that, deleting one by one with ⛔ is faster.
 
 ### Step by Step
 
@@ -78,15 +87,26 @@ The panel automatically appears in the bottom-left corner when you open a YouTub
 4. **Copy timestamps:**
 
    - **Individual:** Click the 📋 icon next to the timestamp
-   - **Complete list:** Click "Copy List"
+   - **Complete list:** Click "Copy Timestamps"
 
 5. **Manage your list:**
-   - Delete unwanted timestamps with the 🗑️ icon
-   - Minimize the panel with the − button
+   - Delete a single timestamp with the ⛔ icon
+   - Past 3 timestamps, checkboxes appear: tick the ones you want gone and click
+     "Delete Selected (N)". The checkbox in the header selects or clears them all.
+   - Minimize the panel with the 🔽 button
 
 ## ⚙️ Settings
 
-The userscript works automatically without requiring configuration. All preferences are saved locally during the session.
+Timestamps are saved automatically per video in the browser's `localStorage`, and
+each one expires 30 days after it was created. Click ⚙️ in the panel header to
+open the settings:
+
+| Setting                                    | Default | What it does                                           |
+| ------------------------------------------ | ------- | ------------------------------------------------------ |
+| **Automatically clean expired timestamps** | Off     | Drops timestamps older than 30 days when a video loads |
+| **Start widget minimized**                 | On      | Opens the panel collapsed, showing only the header     |
+
+Both settings are stored locally and persist across sessions.
 
 ### Supported Sites
 
@@ -102,7 +122,7 @@ The userscript works automatically without requiring configuration. All preferen
 
 The main file users install is `youtube-timestamp-manager.user.js` at the root. It's a single self-contained file that runs directly in the browser — no server, no backend.
 
-Inside `src/` there's a modular version of the same code, split into smaller files to make development easier. Running `npm run build` bundles everything back into one file in `dist/`.
+Inside `src/` there's a modular version of the same code, split into smaller files to make development easier. Running `npm run build` bundles everything back into that root file, so `src/` and `youtube-timestamp-manager.user.js` should always be committed together — never edit the root file by hand.
 
 ```
 youtube-timestamp-manager.user.js   ← what users install (single file)
@@ -128,9 +148,22 @@ src/
 ### Building
 
 ```bash
-npm install       # install esbuild (only dev dependency)
-npm run build     # bundles src/ → dist/youtube-timestamp-manager.user.js
+npm install       # install dev dependencies (esbuild, vitest)
+npm run build     # bundles src/ → youtube-timestamp-manager.user.js (repo root)
 ```
+
+The `@version` line in the root file's userscript header is the single source of
+truth for the version — `build.js` reads it back out on every build.
+
+### Testing
+
+```bash
+npm test          # vitest + jsdom, single run
+npm run test:watch
+```
+
+Every module under `src/` has a suite: helpers in `tests/utils/`, the rest in
+`tests/*.test.js`.
 
 ### Contributing
 
@@ -160,9 +193,18 @@ npm run build     # bundles src/ → dist/youtube-timestamp-manager.user.js
 - Check if the video is not in live mode
 - Reload the page if necessary
 
-## 🌐 Em português
+### Timestamps disappeared
 
-- [Português](README.md)
+- Timestamps expire 30 days after they were created
+- If "Automatically clean expired timestamps" is on, they are dropped the next
+  time you open the video
+- They are stored in the browser's `localStorage`, so clearing site data or
+  using a different browser/profile loses them
+
+## 🌐 Languages
+
+- [English](README.md)
+- [Português](README.pt-BR.md)
 
 ## ⚠️ Disclaimer
 

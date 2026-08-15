@@ -84,9 +84,11 @@ jobs:
         run: |
           new_version="${{ steps.new-version.outputs.new_version }}"
           sed -i "s/@version\s\+[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $new_version/" youtube-timestamp-manager.user.js
-          if [ -f "README.md" ]; then
-            sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$new_version-blue/" README.md
-          fi
+          for readme in README.md README.pt-BR.md; do
+            if [ -f "$readme" ]; then
+              sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$new_version-blue/" "$readme"
+            fi
+          done
 
       # The sed above only rewrites the @version header. __VERSION__ is inlined
       # into the bundle body at build time, so without this rebuild the settings
@@ -138,7 +140,7 @@ jobs:
 
       - name: Commit version bump
         run: |
-          git add youtube-timestamp-manager.user.js README.md
+          git add youtube-timestamp-manager.user.js README.md README.pt-BR.md
           if git diff --cached --quiet; then
             echo "No changes to commit, skipping."
           else
