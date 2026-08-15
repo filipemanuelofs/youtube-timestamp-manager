@@ -38,6 +38,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
       - name: Extract current version from userscript
         id: current-version
         run: |
@@ -80,6 +86,19 @@ jobs:
           sed -i "s/@version\s\+[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $new_version/" youtube-timestamp-manager.user.js
           if [ -f "README.md" ]; then
             sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$new_version-blue/" README.md
+          fi
+
+      # The sed above only rewrites the @version header. __VERSION__ is inlined
+      # into the bundle body at build time, so without this rebuild the settings
+      # modal keeps showing the version from the last local build.
+      - name: Rebuild userscript with bumped version
+        run: |
+          npm ci
+          npm run build
+          built_version=$(grep -oP '@version\s+\K[0-9]+\.[0-9]+\.[0-9]+' youtube-timestamp-manager.user.js)
+          if [ "$built_version" != "${{ steps.new-version.outputs.new_version }}" ]; then
+            echo "Build produced version $built_version, expected ${{ steps.new-version.outputs.new_version }}"
+            exit 1
           fi
 
       - name: Set up Git user
