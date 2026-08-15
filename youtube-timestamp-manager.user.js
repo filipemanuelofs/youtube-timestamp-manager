@@ -861,7 +861,7 @@
           const versionEl = document.createElement("div");
           versionEl.className = "ytts-settings-version";
           const versionText = document.createElement("span");
-          versionText.textContent = `v${"1.4.3"}`;
+          versionText.textContent = `v${"1.4.5"}`;
           const separator = document.createElement("span");
           separator.className = "ytts-settings-version-separator";
           separator.textContent = "|";
