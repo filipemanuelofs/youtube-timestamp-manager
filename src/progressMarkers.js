@@ -189,7 +189,7 @@ export const progressMarkers = {
 
     listItems.forEach((item) => {
       const timeElement = item.querySelector("a");
-      const noteElement = item.querySelector("input");
+      const noteElement = item.querySelector(".ytts-note");
 
       if (timeElement && timeElement.dataset.time) {
         timestamps.push({

@@ -128,6 +128,107 @@ describe("createTimestampItem", () => {
   });
 });
 
+describe("updateSelectionUI", () => {
+  const boxes = () => [...document.querySelectorAll("#ytls-pane .ytts-select")];
+  const selectAll = () => document.querySelector("#ytts-select-all");
+  const deleteBtn = () => document.querySelector("#ytls-delete-selected");
+  const addRows = (count) => {
+    for (let i = 1; i <= count; i++) ui.createTimestampItem(i * 10, `n${i}`);
+  };
+
+  beforeEach(() => createPane());
+
+  it("stays hidden up to the threshold and shows past it", () => {
+    addRows(3);
+    expect(selectAll().style.display).toBe("none");
+    expect(deleteBtn().style.display).toBe("none");
+    expect(boxes().every((box) => box.style.display === "none")).toBe(true);
+
+    ui.createTimestampItem(40, "n4");
+    expect(selectAll().style.display).toBe("");
+    expect(deleteBtn().style.display).toBe("");
+    expect(boxes().every((box) => box.style.display === "")).toBe(true);
+  });
+
+  it("hides again and clears the selection when the list shrinks", () => {
+    addRows(4);
+    boxes()[0].checked = true;
+    ui.updateSelectionUI();
+    expect(deleteBtn().textContent).toBe("Delete Selected (1)");
+
+    rows()[0].remove();
+    ui.updateSelectionUI();
+
+    expect(deleteBtn().style.display).toBe("none");
+    expect(deleteBtn().textContent).toBe("Delete Selected (0)");
+    expect(boxes().some((box) => box.checked)).toBe(false);
+  });
+
+  it("tracks the selected count in the label and disables at zero", () => {
+    addRows(5);
+    expect(deleteBtn().disabled).toBe(true);
+    expect(deleteBtn().textContent).toBe("Delete Selected (0)");
+
+    boxes()[1].checked = true;
+    boxes()[3].checked = true;
+    ui.updateSelectionUI();
+
+    expect(deleteBtn().disabled).toBe(false);
+    expect(deleteBtn().textContent).toBe("Delete Selected (2)");
+  });
+
+  it("marks select-all indeterminate on a partial selection", () => {
+    addRows(4);
+    boxes()[0].checked = true;
+    ui.updateSelectionUI();
+
+    expect(selectAll().indeterminate).toBe(true);
+    expect(selectAll().checked).toBe(false);
+  });
+
+  it("checks select-all once every row is selected", () => {
+    addRows(4);
+    boxes().forEach((box) => {
+      box.checked = true;
+    });
+    ui.updateSelectionUI();
+
+    expect(selectAll().checked).toBe(true);
+    expect(selectAll().indeterminate).toBe(false);
+  });
+
+  it("survives a pane that is not mounted", () => {
+    document.body.replaceChildren();
+    expect(() => ui.updateSelectionUI()).not.toThrow();
+  });
+});
+
+describe("select all", () => {
+  const boxes = () => [...document.querySelectorAll("#ytls-pane .ytts-select")];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    stubVideo({ duration: 120 });
+    ui.init();
+    for (let i = 1; i <= 4; i++) ui.createTimestampItem(i * 10, `n${i}`);
+  });
+
+  it("checks every row and clears them all again", () => {
+    const selectAll = document.querySelector("#ytts-select-all");
+
+    selectAll.checked = true;
+    selectAll.dispatchEvent(new Event("change"));
+    expect(boxes().every((box) => box.checked)).toBe(true);
+    expect(document.querySelector("#ytls-delete-selected").textContent).toBe(
+      "Delete Selected (4)",
+    );
+
+    selectAll.checked = false;
+    selectAll.dispatchEvent(new Event("change"));
+    expect(boxes().some((box) => box.checked)).toBe(false);
+  });
+});
+
 describe("init", () => {
   beforeEach(() => {
     // Only the timers are faked: requestAnimationFrame stays the stub above, so
@@ -141,6 +242,48 @@ describe("init", () => {
     expect(document.querySelector("#ytls-pane")).toBe(pane);
     expect(elements.pane).toBe(pane);
     expect(pane.querySelector("ul .now-playing")).not.toBeNull();
+  });
+
+  it("mounts the selection controls hidden", () => {
+    const pane = ui.init();
+    const selectAll = pane.querySelector(".ytls-header #ytts-select-all");
+    const deleteBtn = pane.querySelector(".ytls-buttons #ytls-delete-selected");
+
+    expect(selectAll).not.toBeNull();
+    expect(deleteBtn).not.toBeNull();
+    expect(selectAll.style.display).toBe("none");
+    expect(deleteBtn.style.display).toBe("none");
+  });
+
+  it("puts the delete button last in the action row", () => {
+    const labels = [...ui.init().querySelectorAll(".ytls-buttons button")].map(
+      (button) => button.textContent,
+    );
+    expect(labels).toEqual([
+      "Add Timestamp",
+      "Copy Timestamps",
+      "Delete Selected (0)",
+    ]);
+  });
+
+  // O header sobrevive ao minimizar, então sem a regra .minimized o select-all
+  // ficaria sozinho lá marcando linhas invisíveis, e o painel voltaria do
+  // minimizado com tudo selecionado e o botão destrutivo já habilitado.
+  it("hides the select-all while the pane is minimized", () => {
+    const pane = ui.init();
+    for (let i = 1; i <= 4; i++) ui.createTimestampItem(i * 10);
+    const selectAll = pane.querySelector("#ytts-select-all");
+    const minimizeBtn = pane.querySelector(".ytls-header").children[2];
+
+    // getStartMinimizedSetting() devolve true por padrão, então o painel nasce
+    // minimizado: é o caminho comum, não um caso de canto.
+    expect(pane.classList.contains("minimized")).toBe(true);
+    expect(getComputedStyle(selectAll).display).toBe("none");
+
+    minimizeBtn.click();
+
+    expect(pane.classList.contains("minimized")).toBe(false);
+    expect(getComputedStyle(selectAll).display).not.toBe("none");
   });
 
   it("starts the watchTime loop", () => {

@@ -3,7 +3,12 @@ import { formatTime } from "./utils/time.js";
 import { getVideoId, getVideo } from "./utils/video.js";
 import { copyToClipboard, showCopyFeedback } from "./utils/clipboard.js";
 import { showNotification } from "./utils/notification.js";
-import { saveTimestamps, loadTimestamps, removeExpiredFromStorage } from "./utils/storage.js";
+import {
+  saveTimestamps,
+  loadTimestamps,
+  removeExpiredFromStorage,
+  deleteVideoTimestamps,
+} from "./utils/storage.js";
 import { progressMarkers } from "./progressMarkers.js";
 // ui e lifecycle importados aqui — usados apenas dentro de funções (não no nível do módulo),
 // portanto referências circulares se resolvem corretamente em runtime.
@@ -111,7 +116,7 @@ export const handlers = {
 
     listItems.forEach((item, i) => {
       const stampLink = item.querySelector("a").href;
-      const note = item.querySelector("input").value;
+      const note = item.querySelector(".ytts-note").value;
       const line = note ? `${stampLink} - ${note}` : stampLink;
       string += (i > 0 ? "\n" : "") + line;
     });
@@ -123,6 +128,33 @@ export const handlers = {
     } else {
       showNotification("❌ Copy failed", 1500);
     }
+  },
+
+  /**
+   * Apaga da lista os timestamps marcados, após confirmação do usuário.
+   * A gravação fica toda com `saveCurrentTimestamps`, que já remove a chave do
+   * vídeo quando a lista fica vazia. Exibe notificação com o total removido.
+   */
+  deleteSelectedTimestamps() {
+    const selected = [
+      ...document.querySelectorAll("#ytls-pane ul li:not(.now-playing)"),
+    ].filter((item) => {
+      const box = item.querySelector(".ytts-select");
+      return box && box.checked;
+    });
+
+    const count = selected.length;
+    if (count === 0) return;
+
+    if (!confirm(`Delete ${count} selected timestamp${count > 1 ? "s" : ""}?`)) {
+      return;
+    }
+
+    selected.forEach((item) => item.remove());
+
+    handlers.saveCurrentTimestamps();
+    ui.updateSelectionUI();
+    showNotification(`🗑️ ${count} timestamp${count > 1 ? "s" : ""} deleted!`);
   },
 
   /**
@@ -138,6 +170,9 @@ export const handlers = {
 
   /**
    * Lê todos os timestamps atualmente na lista e os salva no localStorage.
+   * Lista vazia remove a chave do vídeo em vez de gravar `[]`, para não deixar
+   * chave órfã no storage — e para que o save atrasado do debounce da nota não
+   * ressuscite a chave depois de um delete em massa.
    * Atualiza os marcadores de progresso após salvar.
    */
   saveCurrentTimestamps() {
@@ -151,13 +186,18 @@ export const handlers = {
 
     listItems.forEach((item) => {
       const time = parseInt(item.querySelector("a").dataset.time);
-      const note = item.querySelector("input").value;
+      const note = item.querySelector(".ytts-note").value;
       const creation = item.dataset.creation;
       const expiration = item.dataset.expiration;
       timestamps.push({ time, note, creation, expiration });
     });
 
-    saveTimestamps(videoId, timestamps);
+    if (timestamps.length > 0) {
+      saveTimestamps(videoId, timestamps);
+    } else {
+      deleteVideoTimestamps(videoId);
+    }
+
     progressMarkers.updateMarkers();
   },
 
@@ -209,6 +249,7 @@ export const handlers = {
           .forEach((item) => item.remove());
         handlers.loadSavedTimestamps();
         progressMarkers.updateMarkers();
+        ui.updateSelectionUI();
       }
     }
   },

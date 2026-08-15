@@ -146,6 +146,119 @@ describe("copyList", () => {
   });
 });
 
+describe("deleteSelectedTimestamps", () => {
+  const boxes = () => [...document.querySelectorAll("#ytls-pane .ytts-select")];
+
+  const seedRows = (count) => {
+    for (let i = 1; i <= count; i++) ui.createTimestampItem(i * 10, `n${i}`);
+    handlers.saveCurrentTimestamps();
+  };
+
+  it("deletes only the checked rows, middle ones included", () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    seedRows(5);
+    boxes()[1].checked = true;
+    boxes()[3].checked = true;
+
+    handlers.deleteSelectedTimestamps();
+
+    expect(readListItems()).toEqual([
+      { time: "10", note: "n1" },
+      { time: "30", note: "n3" },
+      { time: "50", note: "n5" },
+    ]);
+    expect(loadTimestamps("vid1").map((t) => t.time)).toEqual([10, 30, 50]);
+  });
+
+  it("asks for confirmation with the selected count", () => {
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirmSpy);
+    seedRows(5);
+    boxes()[0].checked = true;
+    boxes()[2].checked = true;
+
+    handlers.deleteSelectedTimestamps();
+    expect(confirmSpy).toHaveBeenCalledWith("Delete 2 selected timestamps?");
+  });
+
+  it("keeps every row when the delete is cancelled", () => {
+    vi.stubGlobal("confirm", vi.fn(() => false));
+    seedRows(5);
+    boxes()[0].checked = true;
+
+    handlers.deleteSelectedTimestamps();
+
+    expect(readListItems()).toHaveLength(5);
+    expect(loadTimestamps("vid1")).toHaveLength(5);
+  });
+
+  it("does nothing, not even confirm, with no row checked", () => {
+    const confirmSpy = vi.fn(() => true);
+    vi.stubGlobal("confirm", confirmSpy);
+    seedRows(5);
+
+    handlers.deleteSelectedTimestamps();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(readListItems()).toHaveLength(5);
+  });
+
+  it("drops the storage key instead of saving an empty list", () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    seedRows(5);
+    boxes().forEach((box) => {
+      box.checked = true;
+    });
+    progressMarkers.updateMarkers.mockClear();
+
+    handlers.deleteSelectedTimestamps();
+
+    expect(readListItems()).toHaveLength(0);
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
+    expect(progressMarkers.updateMarkers).toHaveBeenCalled();
+  });
+
+  // O debounce de 500ms do campo de nota sobrevive à remoção do `li`: sem a
+  // remoção da chave dentro de `saveCurrentTimestamps`, esse save atrasado
+  // gravava `[]` por cima e ressuscitava a chave recém-apagada.
+  it("keeps the storage key gone after the note debounce fires", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    seedRows(5);
+
+    const firstNote = document.querySelector("#ytls-pane ul .ytts-note");
+    firstNote.value = "editada";
+    firstNote.dispatchEvent(new Event("input"));
+
+    boxes().forEach((box) => {
+      box.checked = true;
+    });
+    handlers.deleteSelectedTimestamps();
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
+
+    vi.advanceTimersByTime(600);
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it("reports the deleted count, pluralised", () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    seedRows(5);
+    boxes()[0].checked = true;
+
+    handlers.deleteSelectedTimestamps();
+    expect(notifySpy).toHaveBeenCalledWith("🗑️ 1 timestamp deleted!");
+
+    notifySpy.mockClear();
+    boxes()[0].checked = true;
+    boxes()[1].checked = true;
+
+    handlers.deleteSelectedTimestamps();
+    expect(notifySpy).toHaveBeenCalledWith("🗑️ 2 timestamps deleted!");
+  });
+});
+
 describe("copyIndividualTimestamp", () => {
   it("copies `note link` and flashes the button", async () => {
     const feedback = vi
@@ -194,7 +307,7 @@ describe("saveCurrentTimestamps", () => {
     ]);
   });
 
-  it("writes an empty list once every row is gone", () => {
+  it("drops the storage key once every row is gone", () => {
     ui.createTimestampItem(15);
     handlers.saveCurrentTimestamps();
     document
@@ -202,7 +315,7 @@ describe("saveCurrentTimestamps", () => {
       .forEach((li) => li.remove());
 
     handlers.saveCurrentTimestamps();
-    expect(loadTimestamps("vid1")).toEqual([]);
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
   });
 
   it("no-ops without a video id", () => {

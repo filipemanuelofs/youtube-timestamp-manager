@@ -241,7 +241,7 @@
           );
           listItems.forEach((item) => {
             const timeElement = item.querySelector("a");
-            const noteElement = item.querySelector("input");
+            const noteElement = item.querySelector(".ytts-note");
             if (timeElement && timeElement.dataset.time) {
               timestamps.push({
                 time: parseInt(timeElement.dataset.time),
@@ -351,6 +351,13 @@
       return [];
     }
   }
+  function deleteVideoTimestamps(videoId) {
+    try {
+      localStorage.removeItem(`${PREFIX}${videoId}`);
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to delete timestamps:", error);
+    }
+  }
   function removeExpiredFromStorage() {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     let cleanedCount = 0;
@@ -410,7 +417,7 @@
   });
 
   // src/ui.js
-  var STYLES, ui;
+  var SELECTION_MIN_COUNT, STYLES, ui;
   var init_ui = __esm({
     "src/ui.js"() {
       init_state();
@@ -418,6 +425,7 @@
       init_notification();
       init_progressMarkers();
       init_handlers();
+      SELECTION_MIN_COUNT = 3;
       STYLES = `
   #ytls-pane {
     background: rgba(0,0,0,.8);
@@ -446,6 +454,14 @@
   #ytls-pane.minimized ul,
   #ytls-pane.minimized .ytls-buttons {
     display: none;
+  }
+  /* O header continua vis\xEDvel quando minimizado, ent\xE3o o "selecionar todos"
+     precisa sair explicitamente: sem isso ele fica sozinho no header, marcando
+     linhas que ningu\xE9m v\xEA, e ao restaurar o painel volta com tudo selecionado e
+     o bot\xE3o destrutivo j\xE1 habilitado. O !important \xE9 necess\xE1rio porque
+     updateSelectionUI escreve display inline, que venceria esta regra. */
+  #ytls-pane.minimized #ytts-select-all {
+    display: none !important;
   }
   #ytls-pane.minimized {
     max-height: auto;
@@ -502,6 +518,23 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
+  /* A regra #ytls-pane input acima n\xE3o filtra tipo, ent\xE3o tamb\xE9m pegaria os
+     checkboxes de sele\xE7\xE3o e os esticaria com cara de campo de texto. */
+  #ytls-pane input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    accent-color: #4FC3F7;
+    cursor: pointer;
+  }
+  #ytls-pane #ytts-select-all {
+    margin-right: auto;
+  }
   .ytls-buttons {
     display: flex;
     gap: 4px;
@@ -524,6 +557,18 @@
   }
   .ytls-buttons button:active {
     transform: translateY(1px);
+  }
+  #ytls-delete-selected {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+  }
+  #ytls-delete-selected:hover:not(:disabled) {
+    background: rgba(255, 107, 107, 0.2);
+    border-color: #ff6b6b;
+  }
+  #ytls-delete-selected:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   #ytls-box {
     display: none;
@@ -671,7 +716,8 @@
       ui = {
         /**
          * Cria e insere um item de timestamp na lista do painel.
-         * Inclui link clicável com o tempo, campo de nota e botões de copiar/deletar.
+         * Inclui checkbox de seleção, link clicável com o tempo, campo de nota e
+         * botões de copiar/deletar.
          * @param {number} time - Tempo em segundos do timestamp.
          * @param {string} [note=""] - Nota inicial para o timestamp.
          * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
@@ -681,12 +727,21 @@
           const li = document.createElement("li");
           li.dataset.creation = creation || now.toISOString();
           li.dataset.expiration = expiration || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3).toISOString();
+          const selectBox = document.createElement("input");
           const a = document.createElement("a");
           const textInput = document.createElement("input");
           const copyBtn = document.createElement("span");
           const deleteBtn = document.createElement("span");
           handlers.updateStamp(a, time);
+          selectBox.type = "checkbox";
+          selectBox.classList.add("ytts-select");
+          selectBox.title = "Select timestamp";
+          selectBox.style.display = "none";
+          selectBox.addEventListener("change", () => {
+            ui.updateSelectionUI();
+          });
           textInput.type = "text";
+          textInput.classList.add("ytts-note");
           textInput.value = note;
           textInput.placeholder = "Add note...";
           textInput.addEventListener(
@@ -708,8 +763,10 @@
             if (confirm("Delete this timestamp?")) {
               li.remove();
               handlers.saveCurrentTimestamps();
+              ui.updateSelectionUI();
             }
           });
+          li.appendChild(selectBox);
           li.appendChild(a);
           li.appendChild(textInput);
           li.appendChild(copyBtn);
@@ -717,7 +774,44 @@
           const list = document.querySelector("#ytls-pane ul");
           const nowPlaying = list.querySelector(".now-playing");
           list.insertBefore(li, nowPlaying);
+          ui.updateSelectionUI();
           return textInput;
+        },
+        /**
+         * Sincroniza a UI de seleção múltipla com o estado atual da lista.
+         * A UI só existe acima de `SELECTION_MIN_COUNT` itens; abaixo disso ela some
+         * e a seleção é limpa, para não sobrar marcação fantasma se a lista voltar a
+         * crescer. Também mantém o rótulo e o estado do botão e do "selecionar todos".
+         * Sai sem efeito se os elementos ainda não estiverem no DOM.
+         */
+        updateSelectionUI() {
+          const items = document.querySelectorAll(
+            "#ytls-pane ul li:not(.now-playing)"
+          );
+          const boxes = [...document.querySelectorAll("#ytls-pane .ytts-select")];
+          const visible = items.length > SELECTION_MIN_COUNT;
+          const display = visible ? "" : "none";
+          if (!visible) {
+            boxes.forEach((box) => {
+              box.checked = false;
+            });
+          }
+          boxes.forEach((box) => {
+            box.style.display = display;
+          });
+          const selectedCount = boxes.filter((box) => box.checked).length;
+          const selectAllBox = document.querySelector("#ytts-select-all");
+          const deleteSelectedBtn = document.querySelector("#ytls-delete-selected");
+          if (selectAllBox) {
+            selectAllBox.style.display = display;
+            selectAllBox.checked = selectedCount > 0 && selectedCount === boxes.length;
+            selectAllBox.indeterminate = selectedCount > 0 && selectedCount < boxes.length;
+          }
+          if (deleteSelectedBtn) {
+            deleteSelectedBtn.style.display = display;
+            deleteSelectedBtn.textContent = `Delete Selected (${selectedCount})`;
+            deleteSelectedBtn.disabled = selectedCount === 0;
+          }
         },
         /**
          * Cria e injeta o painel flutuante principal no `document.body`.
@@ -730,6 +824,17 @@
           pane.id = "ytls-pane";
           const header = document.createElement("div");
           header.className = "ytls-header";
+          const selectAllBox = document.createElement("input");
+          selectAllBox.type = "checkbox";
+          selectAllBox.id = "ytts-select-all";
+          selectAllBox.title = "Select all";
+          selectAllBox.style.display = "none";
+          selectAllBox.addEventListener("change", () => {
+            document.querySelectorAll("#ytls-pane .ytts-select").forEach((box2) => {
+              box2.checked = selectAllBox.checked;
+            });
+            ui.updateSelectionUI();
+          });
           const settingsBtn = document.createElement("span");
           settingsBtn.textContent = "\u2699\uFE0F";
           settingsBtn.classList.add("ytts-icon-btn");
@@ -758,6 +863,7 @@
             setMinimized(!pane.classList.contains("minimized"));
           });
           exitBtn.addEventListener("click", handlers.closePane);
+          header.appendChild(selectAllBox);
           header.appendChild(settingsBtn);
           header.appendChild(minimizeBtn);
           header.appendChild(exitBtn);
@@ -784,8 +890,15 @@
           copyBtn.textContent = "Copy Timestamps";
           copyBtn.dataset.action = "copy";
           copyBtn.addEventListener("click", handlers.copyList);
+          const deleteSelectedBtn = document.createElement("button");
+          deleteSelectedBtn.id = "ytls-delete-selected";
+          deleteSelectedBtn.textContent = "Delete Selected (0)";
+          deleteSelectedBtn.dataset.action = "delete-selected";
+          deleteSelectedBtn.style.display = "none";
+          deleteSelectedBtn.addEventListener("click", handlers.deleteSelectedTimestamps);
           buttons.appendChild(addBtn);
           buttons.appendChild(copyBtn);
+          buttons.appendChild(deleteSelectedBtn);
           const style = document.createElement("style");
           style.textContent = STYLES;
           list.addEventListener("click", handlers.clickStamp);
@@ -1051,7 +1164,7 @@
           let string = "";
           listItems.forEach((item, i) => {
             const stampLink = item.querySelector("a").href;
-            const note = item.querySelector("input").value;
+            const note = item.querySelector(".ytts-note").value;
             const line = note ? `${stampLink} - ${note}` : stampLink;
             string += (i > 0 ? "\n" : "") + line;
           });
@@ -1062,6 +1175,28 @@
           } else {
             showNotification("\u274C Copy failed", 1500);
           }
+        },
+        /**
+         * Apaga da lista os timestamps marcados, após confirmação do usuário.
+         * A gravação fica toda com `saveCurrentTimestamps`, que já remove a chave do
+         * vídeo quando a lista fica vazia. Exibe notificação com o total removido.
+         */
+        deleteSelectedTimestamps() {
+          const selected = [
+            ...document.querySelectorAll("#ytls-pane ul li:not(.now-playing)")
+          ].filter((item) => {
+            const box = item.querySelector(".ytts-select");
+            return box && box.checked;
+          });
+          const count = selected.length;
+          if (count === 0) return;
+          if (!confirm(`Delete ${count} selected timestamp${count > 1 ? "s" : ""}?`)) {
+            return;
+          }
+          selected.forEach((item) => item.remove());
+          handlers.saveCurrentTimestamps();
+          ui.updateSelectionUI();
+          showNotification(`\u{1F5D1}\uFE0F ${count} timestamp${count > 1 ? "s" : ""} deleted!`);
         },
         /**
          * Handler `unload`: sem efeito no browser (evento não suporta diálogo de confirmação).
@@ -1075,6 +1210,9 @@
         },
         /**
          * Lê todos os timestamps atualmente na lista e os salva no localStorage.
+         * Lista vazia remove a chave do vídeo em vez de gravar `[]`, para não deixar
+         * chave órfã no storage — e para que o save atrasado do debounce da nota não
+         * ressuscite a chave depois de um delete em massa.
          * Atualiza os marcadores de progresso após salvar.
          */
         saveCurrentTimestamps() {
@@ -1086,12 +1224,16 @@
           const timestamps = [];
           listItems.forEach((item) => {
             const time = parseInt(item.querySelector("a").dataset.time);
-            const note = item.querySelector("input").value;
+            const note = item.querySelector(".ytts-note").value;
             const creation = item.dataset.creation;
             const expiration = item.dataset.expiration;
             timestamps.push({ time, note, creation, expiration });
           });
-          saveTimestamps(videoId, timestamps);
+          if (timestamps.length > 0) {
+            saveTimestamps(videoId, timestamps);
+          } else {
+            deleteVideoTimestamps(videoId);
+          }
           progressMarkers.updateMarkers();
         },
         /**
@@ -1130,6 +1272,7 @@
               document.querySelectorAll("#ytls-pane ul li:not(.now-playing)").forEach((item) => item.remove());
               handlers.loadSavedTimestamps();
               progressMarkers.updateMarkers();
+              ui.updateSelectionUI();
             }
           }
         }

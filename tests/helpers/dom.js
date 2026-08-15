@@ -2,12 +2,26 @@ import { elements, state } from "../../src/state.js";
 
 /**
  * Builds the minimum pane skeleton that handlers/ui/progressMarkers query:
- * `#ytls-pane > ul > li.now-playing > a + input`.
+ * `#ytls-pane > .ytls-header > #ytts-select-all`, `#ytls-pane > ul >
+ * li.now-playing > a + input` and `#ytls-pane > .ytls-buttons >
+ * #ytls-delete-selected`.
+ *
+ * The selection controls are here so `ui.updateSelectionUI()` hits its real
+ * branches instead of the "element missing" guard. They carry no listeners —
+ * tests that need those call `ui.init()` instead.
  * @returns {HTMLDivElement} The pane element, already in document.body.
  */
 export function createPane() {
   const pane = document.createElement("div");
   pane.id = "ytls-pane";
+
+  const header = document.createElement("div");
+  header.className = "ytls-header";
+  const selectAllBox = document.createElement("input");
+  selectAllBox.type = "checkbox";
+  selectAllBox.id = "ytts-select-all";
+  selectAllBox.style.display = "none";
+  header.appendChild(selectAllBox);
 
   const list = document.createElement("ul");
   const nowLi = document.createElement("li");
@@ -16,7 +30,17 @@ export function createPane() {
   nowLi.appendChild(document.createElement("input"));
   list.appendChild(nowLi);
 
+  const buttons = document.createElement("div");
+  buttons.className = "ytls-buttons";
+  const deleteSelectedBtn = document.createElement("button");
+  deleteSelectedBtn.id = "ytls-delete-selected";
+  deleteSelectedBtn.textContent = "Delete Selected (0)";
+  deleteSelectedBtn.style.display = "none";
+  buttons.appendChild(deleteSelectedBtn);
+
+  pane.appendChild(header);
   pane.appendChild(list);
+  pane.appendChild(buttons);
   document.body.appendChild(pane);
   elements.pane = pane;
   return pane;
@@ -72,7 +96,7 @@ export function readListItems() {
   return [...document.querySelectorAll("#ytls-pane ul li:not(.now-playing)")].map(
     (item) => ({
       time: item.querySelector("a").dataset.time,
-      note: item.querySelector("input").value,
+      note: item.querySelector(".ytts-note").value,
     }),
   );
 }

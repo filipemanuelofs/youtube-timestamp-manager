@@ -4,6 +4,9 @@ import { showNotification } from "./utils/notification.js";
 import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
 
+// Acima desta quantidade de timestamps a UI de seleção múltipla aparece.
+const SELECTION_MIN_COUNT = 3;
+
 const STYLES = `
   #ytls-pane {
     background: rgba(0,0,0,.8);
@@ -32,6 +35,14 @@ const STYLES = `
   #ytls-pane.minimized ul,
   #ytls-pane.minimized .ytls-buttons {
     display: none;
+  }
+  /* O header continua visível quando minimizado, então o "selecionar todos"
+     precisa sair explicitamente: sem isso ele fica sozinho no header, marcando
+     linhas que ninguém vê, e ao restaurar o painel volta com tudo selecionado e
+     o botão destrutivo já habilitado. O !important é necessário porque
+     updateSelectionUI escreve display inline, que venceria esta regra. */
+  #ytls-pane.minimized #ytts-select-all {
+    display: none !important;
   }
   #ytls-pane.minimized {
     max-height: auto;
@@ -88,6 +99,23 @@ const STYLES = `
     opacity: 0.6;
     cursor: not-allowed;
   }
+  /* A regra #ytls-pane input acima não filtra tipo, então também pegaria os
+     checkboxes de seleção e os esticaria com cara de campo de texto. */
+  #ytls-pane input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    accent-color: #4FC3F7;
+    cursor: pointer;
+  }
+  #ytls-pane #ytts-select-all {
+    margin-right: auto;
+  }
   .ytls-buttons {
     display: flex;
     gap: 4px;
@@ -110,6 +138,18 @@ const STYLES = `
   }
   .ytls-buttons button:active {
     transform: translateY(1px);
+  }
+  #ytls-delete-selected {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+  }
+  #ytls-delete-selected:hover:not(:disabled) {
+    background: rgba(255, 107, 107, 0.2);
+    border-color: #ff6b6b;
+  }
+  #ytls-delete-selected:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   #ytls-box {
     display: none;
@@ -258,7 +298,8 @@ const STYLES = `
 export const ui = {
   /**
    * Cria e insere um item de timestamp na lista do painel.
-   * Inclui link clicável com o tempo, campo de nota e botões de copiar/deletar.
+   * Inclui checkbox de seleção, link clicável com o tempo, campo de nota e
+   * botões de copiar/deletar.
    * @param {number} time - Tempo em segundos do timestamp.
    * @param {string} [note=""] - Nota inicial para o timestamp.
    * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
@@ -268,6 +309,7 @@ export const ui = {
     const li = document.createElement("li");
     li.dataset.creation = creation || now.toISOString();
     li.dataset.expiration = expiration || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const selectBox = document.createElement("input");
     const a = document.createElement("a");
     const textInput = document.createElement("input");
     const copyBtn = document.createElement("span");
@@ -275,7 +317,17 @@ export const ui = {
 
     handlers.updateStamp(a, time);
 
+    selectBox.type = "checkbox";
+    selectBox.classList.add("ytts-select");
+    selectBox.title = "Select timestamp";
+    selectBox.style.display = "none";
+
+    selectBox.addEventListener("change", () => {
+      ui.updateSelectionUI();
+    });
+
     textInput.type = "text";
+    textInput.classList.add("ytts-note");
     textInput.value = note;
     textInput.placeholder = "Add note...";
 
@@ -302,9 +354,11 @@ export const ui = {
       if (confirm("Delete this timestamp?")) {
         li.remove();
         handlers.saveCurrentTimestamps();
+        ui.updateSelectionUI();
       }
     });
 
+    li.appendChild(selectBox);
     li.appendChild(a);
     li.appendChild(textInput);
     li.appendChild(copyBtn);
@@ -314,7 +368,52 @@ export const ui = {
     const nowPlaying = list.querySelector(".now-playing");
     list.insertBefore(li, nowPlaying);
 
+    ui.updateSelectionUI();
+
     return textInput;
+  },
+
+  /**
+   * Sincroniza a UI de seleção múltipla com o estado atual da lista.
+   * A UI só existe acima de `SELECTION_MIN_COUNT` itens; abaixo disso ela some
+   * e a seleção é limpa, para não sobrar marcação fantasma se a lista voltar a
+   * crescer. Também mantém o rótulo e o estado do botão e do "selecionar todos".
+   * Sai sem efeito se os elementos ainda não estiverem no DOM.
+   */
+  updateSelectionUI() {
+    const items = document.querySelectorAll(
+      "#ytls-pane ul li:not(.now-playing)",
+    );
+    const boxes = [...document.querySelectorAll("#ytls-pane .ytts-select")];
+    const visible = items.length > SELECTION_MIN_COUNT;
+    const display = visible ? "" : "none";
+
+    if (!visible) {
+      boxes.forEach((box) => {
+        box.checked = false;
+      });
+    }
+
+    boxes.forEach((box) => {
+      box.style.display = display;
+    });
+
+    const selectedCount = boxes.filter((box) => box.checked).length;
+    const selectAllBox = document.querySelector("#ytts-select-all");
+    const deleteSelectedBtn = document.querySelector("#ytls-delete-selected");
+
+    if (selectAllBox) {
+      selectAllBox.style.display = display;
+      selectAllBox.checked = selectedCount > 0 && selectedCount === boxes.length;
+      selectAllBox.indeterminate =
+        selectedCount > 0 && selectedCount < boxes.length;
+    }
+
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.style.display = display;
+      deleteSelectedBtn.textContent = `Delete Selected (${selectedCount})`;
+      deleteSelectedBtn.disabled = selectedCount === 0;
+    }
   },
 
   /**
@@ -329,6 +428,19 @@ export const ui = {
 
     const header = document.createElement("div");
     header.className = "ytls-header";
+
+    const selectAllBox = document.createElement("input");
+    selectAllBox.type = "checkbox";
+    selectAllBox.id = "ytts-select-all";
+    selectAllBox.title = "Select all";
+    selectAllBox.style.display = "none";
+
+    selectAllBox.addEventListener("change", () => {
+      document.querySelectorAll("#ytls-pane .ytts-select").forEach((box) => {
+        box.checked = selectAllBox.checked;
+      });
+      ui.updateSelectionUI();
+    });
 
     const settingsBtn = document.createElement("span");
     settingsBtn.textContent = "⚙️";
@@ -365,6 +477,7 @@ export const ui = {
 
     exitBtn.addEventListener("click", handlers.closePane);
 
+    header.appendChild(selectAllBox);
     header.appendChild(settingsBtn);
     header.appendChild(minimizeBtn);
     header.appendChild(exitBtn);
@@ -398,8 +511,16 @@ export const ui = {
     copyBtn.dataset.action = "copy";
     copyBtn.addEventListener("click", handlers.copyList);
 
+    const deleteSelectedBtn = document.createElement("button");
+    deleteSelectedBtn.id = "ytls-delete-selected";
+    deleteSelectedBtn.textContent = "Delete Selected (0)";
+    deleteSelectedBtn.dataset.action = "delete-selected";
+    deleteSelectedBtn.style.display = "none";
+    deleteSelectedBtn.addEventListener("click", handlers.deleteSelectedTimestamps);
+
     buttons.appendChild(addBtn);
     buttons.appendChild(copyBtn);
+    buttons.appendChild(deleteSelectedBtn);
 
     const style = document.createElement("style");
     style.textContent = STYLES;
