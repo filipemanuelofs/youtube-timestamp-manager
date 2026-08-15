@@ -53,14 +53,22 @@ jobs:
 
       - name: Calculate new version
         id: new-version
+        # A mensagem do commit vem por env, não por ${{ }} dentro do run:. A
+        # interpolação cola o texto no script antes do bash ver, então corpo de
+        # commit com parêntese ou aspas quebra a sintaxe — e $(...) ou crase
+        # executaria comando no runner, que aqui tem contents: write.
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION_TYPE: ${{ github.event.inputs.version_type }}
         run: |
           current="${{ steps.current-version.outputs.current_version }}"
           IFS='.' read -r major minor patch <<< "$current"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            bump_type="${{ github.event.inputs.version_type }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            bump_type="$INPUT_VERSION_TYPE"
           else
-            commit_msg="${{ github.event.head_commit.message }}"
+            commit_msg="$COMMIT_MSG"
             if [[ "$commit_msg" =~ ^(feat|feature)(\(.+\))?!: ]] || [[ "$commit_msg" =~ BREAKING.CHANGE ]]; then
               bump_type="major"
             elif [[ "$commit_msg" =~ ^(feat|feature)(\(.+\))?: ]]; then
@@ -114,15 +122,23 @@ jobs:
           if [ -z "$last_tag" ]; then
             commits=$(git log --pretty=format:"- %s" --reverse)
           else
-            commits=$(git log ${last_tag}..HEAD --pretty=format:"- %s" --reverse)
+            commits=$(git log "${last_tag}..HEAD" --pretty=format:"- %s" --reverse)
           fi
 
-          cat > release_notes.md << EOF
+          # Heredocs delimitados com aspas ('EOF') para o bash não expandir nada
+          # vindo de commit. As expressões do GitHub continuam funcionando: elas
+          # são substituídas no texto do script antes do bash rodar. Os assuntos
+          # de commit entram por printf, senão um cifrão ou uma crase no assunto
+          # viraria expansão de variável ou execução de comando.
+          cat > release_notes.md << 'EOF'
           ## 🚀 What's New in v${{ steps.new-version.outputs.new_version }}
 
           ### Changes
-          $commits
+          EOF
 
+          printf '%s\n\n' "$commits" >> release_notes.md
+
+          cat >> release_notes.md << 'EOF'
           ### 📦 Installation
           Click here to install/update: [youtube-timestamp-manager.user.js](https://github.com/${{ github.repository }}/releases/download/v${{ steps.new-version.outputs.new_version }}/youtube-timestamp-manager.user.js)
 
