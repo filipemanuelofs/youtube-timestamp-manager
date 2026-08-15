@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   saveTimestamps,
   loadTimestamps,
@@ -108,5 +108,60 @@ describe("removeExpiredFromStorage", () => {
     saveTimestamps("vid1", [{ time: 10, expiration: future }]);
     const { affectedVideoIds } = removeExpiredFromStorage();
     expect(affectedVideoIds).toHaveLength(0);
+  });
+
+  it("sweeps every video in one pass", () => {
+    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveTimestamps("vid2", [{ time: 20, expiration: past }]);
+    const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
+    expect(cleanedCount).toBe(2);
+    expect(affectedVideoIds.sort()).toEqual(["vid1", "vid2"]);
+  });
+
+  it("leaves non-ytts_ keys alone", () => {
+    localStorage.setItem("other_key", "not json");
+    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    removeExpiredFromStorage();
+    expect(localStorage.getItem("other_key")).toBe("not json");
+  });
+});
+
+describe("storage resilience", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("loadTimestamps returns [] on corrupt JSON", () => {
+    localStorage.setItem("ytts_vid1", "{not json");
+    expect(loadTimestamps("vid1")).toEqual([]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("getAllSavedVideos skips a corrupt entry and keeps the rest", () => {
+    localStorage.setItem("ytts_broken", "{not json");
+    saveTimestamps("vid1", [{ time: 10 }]);
+    expect(getAllSavedVideos().map((v) => v.videoId)).toEqual(["vid1"]);
+  });
+
+  it("saveTimestamps swallows a write failure", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+    expect(() => saveTimestamps("vid1", [{ time: 10 }])).not.toThrow();
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("removeExpiredFromStorage survives corrupt data and leaves it in place", () => {
+    localStorage.setItem("ytts_broken", "{not json");
+    let result;
+    expect(() => {
+      result = removeExpiredFromStorage();
+    }).not.toThrow();
+
+    expect(result).toEqual({ cleanedCount: 0, affectedVideoIds: [] });
+    expect(localStorage.getItem("ytts_broken")).toBe("{not json");
+    expect(console.error).toHaveBeenCalled();
   });
 });

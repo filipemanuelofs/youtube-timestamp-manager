@@ -40,6 +40,40 @@ describe("getVideoId", () => {
     expect(getVideoId()).toBe("abc123");
   });
 
+  it("parses a /shorts/ URL that carries query params", () => {
+    vi.stubGlobal("location", {
+      search: "",
+      href: "https://www.youtube.com/shorts/shortVidId?feature=share",
+    });
+    expect(getVideoId()).toBe("shortVidId");
+  });
+
+  it("prefers the ?v= param over the path segment", () => {
+    vi.stubGlobal("location", {
+      search: "?v=fromQuery",
+      href: "https://www.youtube.com/live/fromPath?v=fromQuery",
+    });
+    expect(getVideoId()).toBe("fromQuery");
+  });
+
+  it("returns undefined off a video page", () => {
+    vi.stubGlobal("location", {
+      search: "",
+      href: "https://www.youtube.com/",
+    });
+    expect(getVideoId()).toBeUndefined();
+  });
+
+  it("keeps resolving after an undefined result instead of caching it", () => {
+    vi.stubGlobal("location", { search: "", href: "https://www.youtube.com/" });
+    getVideoId();
+    vi.stubGlobal("location", {
+      search: "?v=later123",
+      href: "https://www.youtube.com/watch?v=later123",
+    });
+    expect(getVideoId()).toBe("later123");
+  });
+
   it("caches result in state.videoId", () => {
     vi.stubGlobal("location", {
       search: "?v=cached123",

@@ -40,6 +40,38 @@ describe("debounce", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
+  it("uses the args from the last call", () => {
+    const fn = vi.fn();
+    const debounced = debounce(fn, 100);
+    debounced("first");
+    debounced("last");
+    vi.advanceTimersByTime(100);
+    expect(fn).toHaveBeenCalledExactlyOnceWith("last");
+  });
+
+  it("fires again for a call made after the previous one settled", () => {
+    const fn = vi.fn();
+    const debounced = debounce(fn, 100);
+    debounced();
+    vi.advanceTimersByTime(100);
+    debounced();
+    vi.advanceTimersByTime(100);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps separate timers per debounced function", () => {
+    const a = vi.fn();
+    const b = vi.fn();
+    const debouncedA = debounce(a, 100);
+    const debouncedB = debounce(b, 100);
+
+    debouncedA();
+    debouncedB();
+    vi.advanceTimersByTime(100);
+    expect(a).toHaveBeenCalledOnce();
+    expect(b).toHaveBeenCalledOnce();
+  });
+
   it("resets timer on each call", () => {
     const fn = vi.fn();
     const debounced = debounce(fn, 100);

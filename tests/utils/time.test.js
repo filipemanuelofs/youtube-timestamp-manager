@@ -24,4 +24,19 @@ describe("formatTime", () => {
     expect(formatTime(61)).toBe("1:01");
     expect(formatTime(3601)).toBe("1:00:01");
   });
+
+  it("pads minutes with a leading zero only past the first hour", () => {
+    expect(formatTime(305)).toBe("5:05");
+    expect(formatTime(3905)).toBe("1:05:05");
+  });
+
+  it("truncates fractional seconds", () => {
+    expect(formatTime(65.9)).toBe("1:05");
+    expect(formatTime(3599.99)).toBe("59:59");
+  });
+
+  it("handles durations past 10 hours", () => {
+    expect(formatTime(36000)).toBe("10:00:00");
+    expect(formatTime(86399)).toBe("23:59:59");
+  });
 });
