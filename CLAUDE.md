@@ -29,9 +29,23 @@ release.
 
 ## Tests
 
-`npm test` (vitest + jsdom). Only `src/utils/` is covered, by `tests/utils/`.
-There are no UI, DOM or integration tests — a change to `ui.js`,
-`handlers.js` or `progressMarkers.js` has to be checked in the browser.
+`npm test` (vitest + jsdom). Every module under `src/` has a suite: helpers in
+`tests/utils/`, the rest in `tests/*.test.js`.
+
+`tests/helpers/dom.js` builds the fixtures the DOM suites need — the pane
+skeleton (`#ytls-pane > ul > li.now-playing`), a fake progress bar, and a fake
+video. `getVideo()` is stubbed by assigning `elements.video` directly, since
+jsdom's `HTMLMediaElement.duration` is read-only.
+
+`vitest.config.mjs` mirrors the `__VERSION__` esbuild define, so `src/ui.js`
+imports and runs unbundled in tests.
+
+`src/index.js` patches `history` and attaches listeners at import time; its
+suite reloads the module with `vi.resetModules()` and undoes both in
+`afterEach`. Anything that must be triggered by `popstate` or
+`yt-navigate-finish` has to move the URL with the *pristine* `replaceState`,
+otherwise the patched wrapper fires the navigation and the test passes even
+with the listener deleted.
 
 ## Constraints
 
@@ -41,8 +55,8 @@ There are no UI, DOM or integration tests — a change to `ui.js`,
 - **`@grant none`.** No `GM_*` APIs; persistence is plain `localStorage`.
 - **`handlers.js` imports `ui` and `lifecycle` inside functions**, not at
   module level, to break a circular import. Keep it that way.
-- **`__VERSION__` is an esbuild `define`**, so `src/ui.js` only runs bundled —
-  importing it raw from a test throws.
+- **`__VERSION__` is an esbuild `define`**, so `src/ui.js` only runs bundled.
+  Vitest declares the same define; any other runner has to as well.
 
 ## SPA navigation
 
