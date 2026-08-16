@@ -1,5 +1,6 @@
 import { elements } from "./state.js";
 import { debounce } from "./utils/debounce.js";
+import { drag } from "./drag.js";
 import { showNotification } from "./utils/notification.js";
 import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
@@ -26,11 +27,32 @@ const STYLES = `
   #ytls-pane:hover {
     opacity: 1;
   }
+  /* Painel arrastado para fora do canto: o \`bottom: auto\` é obrigatório, senão
+     \`top\` e \`bottom\` valendo juntos esticariam o painel de uma borda à outra.
+     Fora do canto ele deixa de ser peça encaixada, daí os quatro cantos
+     arredondados; o reset no modal devolve o formato original. */
+  #ytls-pane.moved {
+    bottom: auto;
+    border-radius: 8px;
+  }
+  /* Durante o arraste o ponteiro pode sair do painel, e com ele o :hover — sem
+     isto o painel voltaria para 60% de opacidade no meio do gesto. */
+  #ytls-pane.dragging {
+    opacity: 1;
+    transition: none;
+  }
   .ytls-header {
     display: flex;
     justify-content: flex-end;
     gap: 4px;
     margin-bottom: 5px;
+    cursor: move;
+    /* Sem \`touch-action: none\` o browser trata o gesto como rolagem da página e
+       o \`pointermove\` nunca chega — é o que faz o arraste funcionar no
+       m.youtube.com. */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   #ytls-pane.minimized ul,
   #ytls-pane.minimized .ytls-buttons {
@@ -113,8 +135,18 @@ const STYLES = `
     accent-color: #4FC3F7;
     cursor: pointer;
   }
-  #ytls-pane #ytts-select-all {
+  /* A alça empurra os ícones para a direita, papel que era do select-all. Ela
+     fica antes dele, então o select-all não precisa mais do margin-right. */
+  #ytts-drag-handle {
     margin-right: auto;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 14px;
+    line-height: 1;
+    padding: 1px 4px;
+    cursor: move;
+  }
+  #ytls-pane:hover #ytts-drag-handle {
+    color: rgba(255, 255, 255, 0.8);
   }
   .ytls-buttons {
     display: flex;
@@ -239,7 +271,8 @@ const STYLES = `
     padding: 16px 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
-  .ytts-settings-footer button {
+  .ytts-settings-footer button,
+  #ytts-reset-position {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -249,9 +282,14 @@ const STYLES = `
     cursor: pointer;
     transition: all 0.2s ease;
   }
-  .ytts-settings-footer button:hover {
+  .ytts-settings-footer button:hover,
+  #ytts-reset-position:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.5);
+  }
+  #ytts-reset-position {
+    display: block;
+    margin-top: 16px;
   }
   .ytts-settings-version {
     display: flex;
@@ -414,6 +452,11 @@ export const ui = {
       deleteSelectedBtn.textContent = `Delete Selected (${selectedCount})`;
       deleteSelectedBtn.disabled = selectedCount === 0;
     }
+
+    // Ponto único por onde passam todas as mudanças de tamanho da lista
+    // (adicionar, deletar individual, deletar selecionados, limpar expirados),
+    // e é a altura da lista que empurraria o painel movido para fora da tela.
+    drag.refresh();
   },
 
   /**
@@ -428,6 +471,14 @@ export const ui = {
 
     const header = document.createElement("div");
     header.className = "ytls-header";
+
+    // Minimizado, o cabeçalho é só os três ícones encostados à direita e não
+    // sobra faixa vazia para agarrar; a alça é a área de pega em qualquer
+    // estado, e diz onde pegar sem depender do usuário notar o cursor.
+    const dragHandle = document.createElement("span");
+    dragHandle.id = "ytts-drag-handle";
+    dragHandle.textContent = "⠿";
+    dragHandle.title = "Drag to move";
 
     const selectAllBox = document.createElement("input");
     selectAllBox.type = "checkbox";
@@ -469,6 +520,10 @@ export const ui = {
         minimizeBtn.textContent = "🔽";
         minimizeBtn.title = "Minimize";
       }
+
+      // A altura acabou de mudar: sem isto o painel movido, ancorado por `top`,
+      // descola do rodapé ao minimizar e transborda ao restaurar.
+      drag.refresh();
     };
 
     minimizeBtn.addEventListener("click", () => {
@@ -477,6 +532,7 @@ export const ui = {
 
     exitBtn.addEventListener("click", handlers.closePane);
 
+    header.appendChild(dragHandle);
     header.appendChild(selectAllBox);
     header.appendChild(settingsBtn);
     header.appendChild(minimizeBtn);
@@ -538,6 +594,8 @@ export const ui = {
 
     document.body.appendChild(pane);
     elements.pane = pane;
+
+    drag.init(pane, header);
 
     handlers.watchTime();
 
@@ -620,6 +678,18 @@ export const ui = {
     labelMinimized.appendChild(checkboxMinimized);
     labelMinimized.appendChild(spanMinimized);
     body.appendChild(labelMinimized);
+
+    // Ação, não preferência: age no clique e não passa pelo Save.
+    const resetPositionBtn = document.createElement("button");
+    resetPositionBtn.id = "ytts-reset-position";
+    resetPositionBtn.textContent = "Reset widget position";
+
+    resetPositionBtn.addEventListener("click", () => {
+      drag.resetPosition();
+      showNotification("↩️ Widget position reset");
+    });
+
+    body.appendChild(resetPositionBtn);
 
     const footer = document.createElement("div");
     footer.className = "ytts-settings-footer";

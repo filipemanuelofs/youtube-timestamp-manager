@@ -2,7 +2,8 @@ import { elements, state } from "../../src/state.js";
 
 /**
  * Builds the minimum pane skeleton that handlers/ui/progressMarkers query:
- * `#ytls-pane > .ytls-header > #ytts-select-all`, `#ytls-pane > ul >
+ * `#ytls-pane > .ytls-header > #ytts-drag-handle + #ytts-select-all`,
+ * `#ytls-pane > ul >
  * li.now-playing > a + input` and `#ytls-pane > .ytls-buttons >
  * #ytls-delete-selected`.
  *
@@ -17,6 +18,10 @@ export function createPane() {
 
   const header = document.createElement("div");
   header.className = "ytls-header";
+  const dragHandle = document.createElement("span");
+  dragHandle.id = "ytts-drag-handle";
+  dragHandle.textContent = "⠿";
+  header.appendChild(dragHandle);
   const selectAllBox = document.createElement("input");
   selectAllBox.type = "checkbox";
   selectAllBox.id = "ytts-select-all";

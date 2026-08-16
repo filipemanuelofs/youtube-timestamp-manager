@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ui } from "../src/ui.js";
+import { drag } from "../src/drag.js";
 import { handlers } from "../src/handlers.js";
 import { progressMarkers } from "../src/progressMarkers.js";
 import { elements } from "../src/state.js";
@@ -29,6 +30,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // ui.init() wires the drag listeners; without this each test would leave a
+  // resize listener behind on the shared window.
+  drag.destroy();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -137,6 +141,20 @@ describe("updateSelectionUI", () => {
   };
 
   beforeEach(() => createPane());
+
+  // Every list-size change funnels through here, and the list height is what
+  // pushes a moved pane past the bottom edge.
+  it("repositions the pane whenever the list changes size", () => {
+    const refresh = vi.spyOn(drag, "refresh");
+
+    ui.createTimestampItem(10, "n1");
+    expect(refresh).toHaveBeenCalled();
+
+    refresh.mockClear();
+    document.querySelector("#ytls-pane ul li:not(.now-playing)").remove();
+    ui.updateSelectionUI();
+    expect(refresh).toHaveBeenCalled();
+  });
 
   it("stays hidden up to the threshold and shows past it", () => {
     addRows(3);
@@ -273,7 +291,9 @@ describe("init", () => {
     const pane = ui.init();
     for (let i = 1; i <= 4; i++) ui.createTimestampItem(i * 10);
     const selectAll = pane.querySelector("#ytts-select-all");
-    const minimizeBtn = pane.querySelector(".ytls-header").children[2];
+    // Title flips between Minimize/Restore, so pick it by position among the
+    // icon buttons (settings, minimize, close) — the drag handle is not one.
+    const minimizeBtn = pane.querySelectorAll(".ytls-header .ytts-icon-btn")[1];
 
     // getStartMinimizedSetting() devolve true por padrão, então o painel nasce
     // minimizado: é o caminho comum, não um caso de canto.
@@ -289,6 +309,44 @@ describe("init", () => {
   it("starts the watchTime loop", () => {
     ui.init();
     expect(requestAnimationFrame).toHaveBeenCalledWith(handlers.watchTime);
+  });
+
+  it("puts the drag handle first in the header and keeps it while minimized", () => {
+    const pane = ui.init();
+    const handle = pane.querySelector("#ytts-drag-handle");
+
+    expect(pane.querySelector(".ytls-header").firstElementChild).toBe(handle);
+    expect(pane.classList.contains("minimized")).toBe(true);
+    expect(getComputedStyle(handle).display).not.toBe("none");
+  });
+
+  // Minimizing changes the pane height, and a moved pane anchored by `top`
+  // would come unstuck from the bottom edge without a reposition.
+  it("repositions the pane after minimizing and restoring", () => {
+    const refresh = vi.spyOn(drag, "refresh");
+    const pane = ui.init();
+    const minimizeBtn = pane.querySelectorAll(".ytls-header .ytts-icon-btn")[1];
+
+    const before = refresh.mock.calls.length;
+    minimizeBtn.click();
+    minimizeBtn.click();
+
+    expect(refresh.mock.calls.length).toBe(before + 2);
+  });
+
+  it("hands the pane and its header to the drag module", () => {
+    const dragInit = vi.spyOn(drag, "init");
+    const pane = ui.init();
+
+    expect(dragInit).toHaveBeenCalledWith(pane, pane.querySelector(".ytls-header"));
+  });
+
+  it("mounts already moved when a position was saved", () => {
+    drag.savePosition(120, 340);
+    const pane = ui.init();
+
+    expect([pane.style.left, pane.style.top]).toEqual(["340px", "120px"]);
+    expect(pane.classList.contains("moved")).toBe(true);
   });
 
   it("loads saved timestamps a second in", () => {
@@ -370,6 +428,20 @@ describe("settings", () => {
 
     expect(document.querySelector("#auto-cleanup-expired").checked).toBe(true);
     expect(document.querySelector("#start-minimized").checked).toBe(false);
+  });
+
+  it("resets the pane position on the spot, without waiting for save", () => {
+    const pane = document.querySelector("#ytls-pane");
+    drag.savePosition(120, 340);
+    drag.applyPosition(pane, 120, 340);
+    ui.openSettingsModal();
+
+    document.querySelector("#ytts-reset-position").click();
+
+    expect([pane.style.left, pane.style.top]).toEqual(["", ""]);
+    expect(pane.classList.contains("moved")).toBe(false);
+    expect(drag.getSavedPosition()).toBeNull();
+    expect(document.querySelector("#ytts-settings-modal")).not.toBeNull();
   });
 
   it("shows the build version in the footer", () => {

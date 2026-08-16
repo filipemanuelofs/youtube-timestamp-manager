@@ -17,6 +17,7 @@
 - ☑️ **Apagar em lote** - marque vários timestamps e remova todos de uma vez
 - 📍 **Marcadores na barra de progresso** - cada timestamp vira um pino clicável no scrubber do vídeo
 - 💾 **Salvamento automático** - os timestamps ficam guardados por vídeo e expiram em 30 dias
+- ⠿ **Arrastar o painel** - pegue pela alça e solte onde quiser; o lugar fica guardado
 - 🔽 **Minimizar o painel** para não atrapalhar a experiência de assistir
 - ⚡ **Navegação rápida** - clique no timestamp para pular para aquele momento
 - 🎬 **Suporte completo** - YouTube, Lives, Shorts, Mobile e YouTube Music
@@ -51,10 +52,13 @@
 
 O painel aparece sozinho no canto inferior esquerdo quando você abre um vídeo do YouTube. Ele começa minimizado — clique em 🔼 para expandir, ou desligue esse comportamento nas configurações.
 
+Arraste pela alça ⠿ para deixar o painel onde quiser. O lugar fica guardado entre vídeos e recarregamentos, e o painel nunca sai da janela: ele gruda na borda mais próxima, então minimizar ou adicionar timestamps não o empurra para fora da tela. O botão "Reset widget position", nas configurações, devolve o painel ao canto.
+
 ### Controles do painel
 
 | Botão/Ícone             | Função                                        |
 | ----------------------- | --------------------------------------------- |
+| **⠿**                   | Alça de arraste — move o painel pela tela     |
 | **⚙️**                  | Abrir configurações                           |
 | **🔽 / 🔼**             | Minimizar/restaurar o painel                  |
 | **❌**                  | Fechar o painel (com confirmação)             |
@@ -94,6 +98,7 @@ Os controles de seleção só aparecem quando a lista passa de 3 timestamps — 
    - Passando de 3 timestamps, aparecem os checkboxes: marque os que quer remover e
      clique em "Delete Selected (N)". O checkbox do cabeçalho marca ou desmarca todos.
    - Minimize o painel com o botão 🔽
+   - Tire o painel do caminho arrastando pela alça ⠿ — ele continua lá no próximo vídeo
 
 ## ⚙️ Configurações
 
@@ -106,7 +111,12 @@ abrir as configurações:
 | **Automatically clean expired timestamps** | Desligado | Descarta timestamps com mais de 30 dias quando o vídeo carrega  |
 | **Start widget minimized**                 | Ligado   | Abre o painel recolhido, mostrando só o cabeçalho               |
 
-As duas ficam guardadas localmente e sobrevivem ao fechar o navegador.
+As configurações também trazem o botão **Reset widget position**, que apaga a
+posição salva e devolve o painel ao canto inferior esquerdo. Ele age no clique,
+sem precisar do Save.
+
+As duas configurações ficam guardadas localmente e sobrevivem ao fechar o
+navegador — a posição do painel também.
 
 ### Sites suportados
 
@@ -133,6 +143,7 @@ src/
 ├── lifecycle.js        ← cria ou remove o painel ao navegar entre páginas
 ├── ui.js               ← monta todos os elementos visíveis (painel, botões, lista)
 ├── handlers.js         ← responde às ações do usuário (adicionar, copiar, apagar)
+├── drag.js             ← move o painel pela tela e o mantém dentro da janela
 ├── progressMarkers.js  ← posiciona os marcadores clicáveis na barra de progresso
 └── utils/
     ├── time.js         ← converte segundos em tempo legível (ex.: 1:23:45)
@@ -143,7 +154,7 @@ src/
     └── video.js        ← encontra o elemento de vídeo e lê o ID do vídeo atual
 ```
 
-**Como eles se conectam:** o `index.js` inicia tudo. Ao abrir um vídeo do YouTube, ele chama o `lifecycle.js` para montar o painel. O `ui.js` constrói a interface e liga os botões ao `handlers.js`. Ao adicionar um timestamp, o `handlers.js` salva pelo `storage.js` e avisa o `progressMarkers.js` para atualizar os marcadores da barra de progresso. Ao sair do vídeo, o `lifecycle.js` remove tudo e limpa o estado.
+**Como eles se conectam:** o `index.js` inicia tudo. Ao abrir um vídeo do YouTube, ele chama o `lifecycle.js` para montar o painel. O `ui.js` constrói a interface e liga os botões ao `handlers.js`. Ao adicionar um timestamp, o `handlers.js` salva pelo `storage.js` e avisa o `progressMarkers.js` para atualizar os marcadores da barra de progresso. O `drag.js` é dono de onde o painel fica: o `ui.js` entrega o painel a ele na montagem e o avisa sempre que a altura muda, para ele manter o painel grudado na borda mais próxima. Ao sair do vídeo, o `lifecycle.js` remove tudo e limpa o estado.
 
 ### Build
 
@@ -180,6 +191,12 @@ Todo módulo de `src/` tem uma suíte: os helpers em `tests/utils/`, o resto em
 - Confira se o Violentmonkey está ativo
 - Confirme que você está em uma página do YouTube
 - Recarregue a página (F5 ou CTRL+F5)
+
+### O painel ficou num lugar ruim
+
+- Arraste pela alça ⠿ no cabeçalho
+- Ou abra o ⚙️ e clique em "Reset widget position" para devolvê-lo ao canto
+  inferior esquerdo
 
 ### O botão de copiar não funciona
 

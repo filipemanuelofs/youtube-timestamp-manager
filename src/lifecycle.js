@@ -1,4 +1,5 @@
 import { elements, state } from "./state.js";
+import { drag } from "./drag.js";
 import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
 import { ui } from "./ui.js";
@@ -19,14 +20,16 @@ export function shouldShowTimestampManager() {
 
 /**
  * Encerra e remove o gerenciador de timestamps da página.
- * Cancela o loop de animação, remove o painel do DOM, destrói os marcadores de progresso
- * e limpa todas as referências de estado.
+ * Cancela o loop de animação, desliga o arraste do painel, remove o painel do DOM,
+ * destrói os marcadores de progresso e limpa todas as referências de estado.
  */
 export function cleanupTimestampManager() {
   if (state.nowid) {
     cancelAnimationFrame(state.nowid);
     state.nowid = null;
   }
+
+  drag.destroy();
 
   if (elements.pane) {
     elements.pane.remove();

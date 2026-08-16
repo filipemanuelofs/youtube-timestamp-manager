@@ -17,6 +17,7 @@
 - ☑️ **Bulk delete** - select multiple timestamps and remove them in one go
 - 📍 **Progress bar markers** - every timestamp gets a clickable pin on the video scrubber
 - 💾 **Automatic saving** - timestamps persist per video and expire after 30 days
+- ⠿ **Drag the panel anywhere** - grab the handle and drop it where it suits you; the spot is remembered
 - 🔽 **Minimize panel** to avoid interfering with viewing experience
 - ⚡ **Quick navigation** - click timestamp to jump to that moment
 - 🎬 **Full support** - YouTube, Lives, Shorts, Mobile and YouTube Music
@@ -51,10 +52,13 @@
 
 The panel automatically appears in the bottom-left corner when you open a YouTube video. It starts minimized by default — click 🔼 to expand it, or turn the behaviour off in the settings.
 
+Drag it by the ⠿ handle to park it anywhere on screen. The spot is remembered across videos and reloads, and the panel always stays inside the window: it sticks to whichever edge it is nearest, so minimizing it or adding timestamps never pushes it off screen. "Reset widget position" in the settings sends it back to the corner.
+
 ### Panel Controls
 
 | Button/Icon             | Function                                           |
 | ----------------------- | -------------------------------------------------- |
+| **⠿**                   | Drag handle — move the panel around the screen     |
 | **⚙️**                  | Open settings                                      |
 | **🔽 / 🔼**             | Minimize/restore panel                             |
 | **❌**                  | Close panel (with confirmation)                    |
@@ -94,6 +98,7 @@ The selection controls only show up once the list has more than 3 timestamps —
    - Past 3 timestamps, checkboxes appear: tick the ones you want gone and click
      "Delete Selected (N)". The checkbox in the header selects or clears them all.
    - Minimize the panel with the 🔽 button
+   - Drag the panel out of the way by the ⠿ handle — it stays there for the next video
 
 ## ⚙️ Settings
 
@@ -106,7 +111,12 @@ open the settings:
 | **Automatically clean expired timestamps** | Off     | Drops timestamps older than 30 days when a video loads |
 | **Start widget minimized**                 | On      | Opens the panel collapsed, showing only the header     |
 
-Both settings are stored locally and persist across sessions.
+The settings also carry a **Reset widget position** button, which drops the saved
+position and sends the panel back to the bottom-left corner. It acts on click —
+no need to press Save.
+
+Both settings are stored locally and persist across sessions, and so is the panel
+position.
 
 ### Supported Sites
 
@@ -133,6 +143,7 @@ src/
 ├── lifecycle.js        ← creates or removes the panel when navigating between pages
 ├── ui.js               ← builds all the visible elements (panel, buttons, list)
 ├── handlers.js         ← responds to user actions (add, copy, delete timestamp)
+├── drag.js             ← moves the panel around and keeps it inside the window
 ├── progressMarkers.js  ← places clickable markers on the YouTube progress bar
 └── utils/
     ├── time.js         ← converts seconds to readable time (e.g. 1:23:45)
@@ -143,7 +154,7 @@ src/
     └── video.js        ← finds the video element and reads the current video ID
 ```
 
-**How they connect:** `index.js` starts everything. When you open a YouTube video, it calls `lifecycle.js` to mount the panel. `ui.js` builds the panel UI and wires up buttons to `handlers.js`. When you add a timestamp, `handlers.js` saves it via `storage.js` and tells `progressMarkers.js` to update the markers on the progress bar. When you leave the video, `lifecycle.js` removes everything and clears state.
+**How they connect:** `index.js` starts everything. When you open a YouTube video, it calls `lifecycle.js` to mount the panel. `ui.js` builds the panel UI and wires up buttons to `handlers.js`. When you add a timestamp, `handlers.js` saves it via `storage.js` and tells `progressMarkers.js` to update the markers on the progress bar. `drag.js` owns where the panel sits: `ui.js` hands it the panel on mount and pings it whenever the panel's height changes, so it can keep the panel anchored to its nearest edge. When you leave the video, `lifecycle.js` removes everything and clears state.
 
 ### Building
 
@@ -180,6 +191,12 @@ Every module under `src/` has a suite: helpers in `tests/utils/`, the rest in
 - Check if Violentmonkey is active
 - Confirm you're on a YouTube page
 - Reload the page (F5 or CTRL+F5)
+
+### Panel is somewhere awkward
+
+- Drag it by the ⠿ handle in the header
+- Or open ⚙️ and click "Reset widget position" to send it back to the
+  bottom-left corner
 
 ### Copy button doesn't work
 

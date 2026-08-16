@@ -5,6 +5,7 @@ import {
   initTimestampManager,
 } from "../src/lifecycle.js";
 import { ui } from "../src/ui.js";
+import { drag } from "../src/drag.js";
 import { handlers } from "../src/handlers.js";
 import { progressMarkers } from "../src/progressMarkers.js";
 import { elements, state } from "../src/state.js";
@@ -77,6 +78,16 @@ describe("cleanupTimestampManager", () => {
     cleanupTimestampManager();
     expect(document.querySelector("#ytls-pane")).toBeNull();
     expect(elements.pane).toBeNull();
+    expect(destroy).toHaveBeenCalled();
+  });
+
+  // Every SPA navigation runs cleanup then init; without this the drag module
+  // would stack one resize listener per visited video.
+  it("shuts the drag module down", () => {
+    createPane();
+    const destroy = vi.spyOn(drag, "destroy");
+
+    cleanupTimestampManager();
     expect(destroy).toHaveBeenCalled();
   });
 

@@ -41,6 +41,312 @@
     }
   });
 
+  // src/utils/debounce.js
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+  var init_debounce = __esm({
+    "src/utils/debounce.js"() {
+    }
+  });
+
+  // src/drag.js
+  var POSITION_KEY, RESIZE_DEBOUNCE, drag;
+  var init_drag = __esm({
+    "src/drag.js"() {
+      init_state();
+      init_debounce();
+      POSITION_KEY = "ytts_pane_position";
+      RESIZE_DEBOUNCE = 100;
+      drag = {
+        _pane: null,
+        _header: null,
+        // Distância entre o ponteiro e o canto superior esquerdo do painel no início
+        // do arraste; mantém o painel preso ao ponto onde foi agarrado.
+        _offset: null,
+        // Medidas tiradas no início do arraste. O painel não muda de tamanho no meio
+        // do gesto, então medir a cada `pointermove` só custaria reflow.
+        _dims: null,
+        // Houve movimento neste gesto? Um clique na alça não deve gravar posição.
+        _moved: false,
+        // Posição pretendida pelo usuário, mais a distância dali até o rodapé da
+        // viewport. É intenção, não o que está na tela: o clamp pode empurrar o
+        // painel para dentro sem mexer aqui, e por isso desfazer o que empurrou
+        // (crescer a janela de novo, restaurar o painel) devolve o lugar escolhido.
+        _anchor: null,
+        _pointerId: null,
+        _onResize: null,
+        /**
+         * Limita uma posição para que o painel caia inteiro dentro da viewport.
+         * É função pura de propósito: recebe todas as medidas por parâmetro e não
+         * toca em DOM nem em `window`. O jsdom não faz layout e devolve zero em
+         * `offsetWidth` / `getBoundingClientRect`, então clamp que mede o DOM por
+         * dentro seria intestável. Quem mede é `drag.measure`.
+         * @param {{top: number, left: number, paneW: number, paneH: number, viewW: number, viewH: number}} dims
+         * @returns {{top: number, left: number}} Posição limitada às bordas da viewport.
+         */
+        clampToViewport({ top, left, paneW, paneH, viewW, viewH }) {
+          const maxLeft = Math.max(0, viewW - paneW);
+          const maxTop = Math.max(0, viewH - paneH);
+          return {
+            top: Math.min(Math.max(top, 0), maxTop),
+            left: Math.min(Math.max(left, 0), maxLeft)
+          };
+        },
+        /**
+         * Lê as medidas do painel e da janela para alimentar `clampToViewport`.
+         * Único trecho do módulo que depende de layout real, logo o único que os
+         * testes em jsdom não conseguem exercitar.
+         * @param {HTMLElement} pane - Painel a medir.
+         * @returns {{paneW: number, paneH: number, viewW: number, viewH: number}} Medidas atuais.
+         */
+        measure(pane) {
+          return {
+            paneW: pane.offsetWidth,
+            paneH: pane.offsetHeight,
+            viewW: window.innerWidth,
+            viewH: window.innerHeight
+          };
+        },
+        /**
+         * Lê a posição salva no localStorage.
+         * @returns {{top: number, left: number}|null} Posição salva, ou `null` se não houver ou estiver corrompida.
+         */
+        getSavedPosition() {
+          try {
+            const data = localStorage.getItem(POSITION_KEY);
+            if (!data) return null;
+            const position = JSON.parse(data);
+            if (!Number.isFinite(position?.top) || !Number.isFinite(position?.left)) {
+              return null;
+            }
+            return { top: position.top, left: position.left };
+          } catch {
+            return null;
+          }
+        },
+        /**
+         * Persiste a posição do painel no localStorage.
+         * @param {number} top - Distância do topo da viewport, em pixels.
+         * @param {number} left - Distância da esquerda da viewport, em pixels.
+         */
+        savePosition(top, left) {
+          try {
+            localStorage.setItem(POSITION_KEY, JSON.stringify({ top, left }));
+          } catch (error) {
+            console.error("[YT Timestamp Manager] Failed to save position:", error);
+          }
+        },
+        /** Remove a posição salva do localStorage. */
+        clearPosition() {
+          try {
+            localStorage.removeItem(POSITION_KEY);
+          } catch (error) {
+            console.error("[YT Timestamp Manager] Failed to clear position:", error);
+          }
+        },
+        /**
+         * Posiciona o painel na tela. A classe `moved` é o que zera o `bottom: 0` do
+         * CSS — sem ela, `top` e `bottom` definidos ao mesmo tempo esticariam o
+         * painel de uma borda à outra.
+         * @param {HTMLElement} pane - Painel a posicionar.
+         * @param {number} top - Distância do topo da viewport, em pixels.
+         * @param {number} left - Distância da esquerda da viewport, em pixels.
+         */
+        applyPosition(pane, top, left) {
+          pane.classList.add("moved");
+          pane.style.top = `${top}px`;
+          pane.style.left = `${left}px`;
+        },
+        /**
+         * Clampa uma posição pretendida e a escreve no painel. Único caminho por
+         * onde o painel se move, seja por arraste, por `resize` ou por mudança de
+         * altura.
+         * @param {HTMLElement} pane - Painel a posicionar.
+         * @param {number} top - Posição pretendida a partir do topo, em pixels.
+         * @param {number} left - Posição pretendida a partir da esquerda, em pixels.
+         * @param {{paneW: number, paneH: number, viewW: number, viewH: number}} [dims] - Medidas já tiradas; medidas na hora se omitido.
+         * @returns {{top: number, left: number}} Posição efetivamente aplicada.
+         */
+        _place(pane, top, left, dims = drag.measure(pane)) {
+          const placed = drag.clampToViewport({ top, left, ...dims });
+          drag.applyPosition(pane, placed.top, placed.left);
+          return placed;
+        },
+        /**
+         * Devolve o painel ao canto inferior esquerdo padrão e esquece a posição salva.
+         * Sai sem efeito se o painel não estiver montado.
+         */
+        resetPosition() {
+          drag.clearPosition();
+          drag._anchor = null;
+          const pane = elements.pane;
+          if (!pane) return;
+          pane.classList.remove("moved");
+          pane.style.top = "";
+          pane.style.left = "";
+        },
+        /**
+         * Aplica a posição salva (se houver) e liga o arraste pelo cabeçalho.
+         * Desliga primeiro o que estiver ligado: um `init` sem o `destroy` do
+         * lifecycle (painel remontado por um caminho que não passou pelo cleanup)
+         * sobrescreveria `_onResize` e deixaria o listener anterior preso à janela
+         * para sempre, já que `destroy` só sabe remover a última referência.
+         * @param {HTMLElement} pane - Painel a arrastar.
+         * @param {HTMLElement} header - Faixa que funciona como alça de arraste.
+         */
+        init(pane, header) {
+          drag.destroy();
+          drag._pane = pane;
+          drag._header = header;
+          const saved = drag.getSavedPosition();
+          if (saved) {
+            const dims = drag.measure(pane);
+            drag._place(pane, saved.top, saved.left, dims);
+            drag._setAnchor(saved.top, saved.left, dims);
+          }
+          header.addEventListener("pointerdown", drag._onPointerDown);
+          drag._onResize = debounce(drag.refresh, RESIZE_DEBOUNCE);
+          window.addEventListener("resize", drag._onResize);
+        },
+        /**
+         * Guarda a posição pretendida e a distância dali até o rodapé da viewport.
+         * @param {number} top - Posição pretendida a partir do topo, em pixels.
+         * @param {number} left - Posição pretendida a partir da esquerda, em pixels.
+         * @param {{paneH: number, viewH: number}} dims - Medidas usadas para posicionar.
+         */
+        _setAnchor(top, left, { paneH, viewH }) {
+          drag._anchor = { top, left, fromBottom: viewH - (top + paneH) };
+        },
+        /**
+         * Recoloca o painel a partir da âncora, respeitando a borda vertical mais
+         * próxima: encostado embaixo, ele continua encostado embaixo quando a altura
+         * muda (minimizar, restaurar, ganhar ou perder timestamps); encostado em
+         * cima, o topo é que fica parado. Sem isto o painel, ancorado só por `top`,
+         * cresce sempre para baixo e escorre para fora da tela.
+         *
+         * Também é o que roda no `resize`. A âncora não é reescrita aqui, então
+         * desfazer o que empurrou o painel devolve a posição escolhida.
+         *
+         * Sem efeito enquanto o painel estiver no canto padrão: lá o `bottom: 0` do
+         * CSS já ancora pelo rodapé.
+         */
+        refresh() {
+          const pane = drag._pane;
+          const anchor = drag._anchor;
+          if (!pane || !anchor || !pane.classList.contains("moved")) return;
+          const dims = drag.measure(pane);
+          const top = anchor.fromBottom < anchor.top ? dims.viewH - dims.paneH - anchor.fromBottom : anchor.top;
+          drag._place(pane, top, anchor.left, dims);
+        },
+        /**
+         * Início do arraste. Ignora cliques nos ícones do cabeçalho, que continuam
+         * sendo só clique.
+         * @param {PointerEvent} e - Evento de `pointerdown` no cabeçalho.
+         */
+        _onPointerDown(e) {
+          if (e.button !== 0) return;
+          if (drag._offset) return;
+          if (e.target.closest(".ytts-icon-btn, #ytts-select-all")) return;
+          const pane = drag._pane;
+          if (!pane) return;
+          const rect = pane.getBoundingClientRect();
+          drag._offset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          drag._dims = drag.measure(pane);
+          drag._moved = false;
+          e.preventDefault();
+          if (drag._header.setPointerCapture) {
+            drag._header.setPointerCapture(e.pointerId);
+            drag._pointerId = e.pointerId;
+          }
+          pane.classList.add("dragging");
+          window.addEventListener("pointermove", drag._onPointerMove);
+          window.addEventListener("pointerup", drag._onPointerUp);
+          window.addEventListener("pointercancel", drag._onPointerUp);
+        },
+        /**
+         * Move o painel acompanhando o ponteiro, sempre dentro da viewport.
+         * @param {PointerEvent} e - Evento de `pointermove` na janela.
+         */
+        _onPointerMove(e) {
+          const pane = drag._pane;
+          if (!pane || !drag._offset) return;
+          const { top, left } = drag._place(
+            pane,
+            e.clientY - drag._offset.y,
+            e.clientX - drag._offset.x,
+            drag._dims
+          );
+          drag._setAnchor(top, left, drag._dims);
+          drag._moved = true;
+        },
+        /**
+         * Fim do arraste: solta os listeners de janela e persiste a posição.
+         * Serve também ao `pointercancel`, que grava o que já tinha sido movido.
+         *
+         * A gravação e a limpeza vêm antes de soltar a captura de ponteiro, e a
+         * liberação em si vai dentro de `try`: `releasePointerCapture` lança
+         * `NotFoundError` quando o ponteiro já não está ativo — o caso do
+         * `pointercancel` — e a exceção levaria junto tudo que viesse depois,
+         * perdendo a posição arrastada.
+         */
+        _onPointerUp() {
+          window.removeEventListener("pointermove", drag._onPointerMove);
+          window.removeEventListener("pointerup", drag._onPointerUp);
+          window.removeEventListener("pointercancel", drag._onPointerUp);
+          if (drag._pane) {
+            drag._pane.classList.remove("dragging");
+          }
+          if (drag._moved && drag._anchor) {
+            drag.savePosition(drag._anchor.top, drag._anchor.left);
+          }
+          drag._offset = null;
+          drag._dims = null;
+          drag._moved = false;
+          if (drag._pointerId !== null && drag._header?.releasePointerCapture) {
+            try {
+              drag._header.releasePointerCapture(drag._pointerId);
+            } catch {
+            }
+            drag._pointerId = null;
+          }
+        },
+        /**
+         * Desliga o arraste e limpa o estado do módulo.
+         * Chamado a cada navegação SPA: sem isso, cada painel recriado deixaria para
+         * trás um listener de `resize`.
+         */
+        destroy() {
+          if (drag._onResize) {
+            window.removeEventListener("resize", drag._onResize);
+            drag._onResize = null;
+          }
+          if (drag._header) {
+            drag._header.removeEventListener("pointerdown", drag._onPointerDown);
+          }
+          window.removeEventListener("pointermove", drag._onPointerMove);
+          window.removeEventListener("pointerup", drag._onPointerUp);
+          window.removeEventListener("pointercancel", drag._onPointerUp);
+          drag._pane = null;
+          drag._header = null;
+          drag._offset = null;
+          drag._dims = null;
+          drag._moved = false;
+          drag._anchor = null;
+          drag._pointerId = null;
+        }
+      };
+    }
+  });
+
   // src/utils/video.js
   function getVideoId() {
     if (!state.videoId) {
@@ -399,29 +705,13 @@
     }
   });
 
-  // src/utils/debounce.js
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-  var init_debounce = __esm({
-    "src/utils/debounce.js"() {
-    }
-  });
-
   // src/ui.js
   var SELECTION_MIN_COUNT, STYLES, ui;
   var init_ui = __esm({
     "src/ui.js"() {
       init_state();
       init_debounce();
+      init_drag();
       init_notification();
       init_progressMarkers();
       init_handlers();
@@ -445,11 +735,32 @@
   #ytls-pane:hover {
     opacity: 1;
   }
+  /* Painel arrastado para fora do canto: o \`bottom: auto\` \xE9 obrigat\xF3rio, sen\xE3o
+     \`top\` e \`bottom\` valendo juntos esticariam o painel de uma borda \xE0 outra.
+     Fora do canto ele deixa de ser pe\xE7a encaixada, da\xED os quatro cantos
+     arredondados; o reset no modal devolve o formato original. */
+  #ytls-pane.moved {
+    bottom: auto;
+    border-radius: 8px;
+  }
+  /* Durante o arraste o ponteiro pode sair do painel, e com ele o :hover \u2014 sem
+     isto o painel voltaria para 60% de opacidade no meio do gesto. */
+  #ytls-pane.dragging {
+    opacity: 1;
+    transition: none;
+  }
   .ytls-header {
     display: flex;
     justify-content: flex-end;
     gap: 4px;
     margin-bottom: 5px;
+    cursor: move;
+    /* Sem \`touch-action: none\` o browser trata o gesto como rolagem da p\xE1gina e
+       o \`pointermove\` nunca chega \u2014 \xE9 o que faz o arraste funcionar no
+       m.youtube.com. */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   #ytls-pane.minimized ul,
   #ytls-pane.minimized .ytls-buttons {
@@ -532,8 +843,18 @@
     accent-color: #4FC3F7;
     cursor: pointer;
   }
-  #ytls-pane #ytts-select-all {
+  /* A al\xE7a empurra os \xEDcones para a direita, papel que era do select-all. Ela
+     fica antes dele, ent\xE3o o select-all n\xE3o precisa mais do margin-right. */
+  #ytts-drag-handle {
     margin-right: auto;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 14px;
+    line-height: 1;
+    padding: 1px 4px;
+    cursor: move;
+  }
+  #ytls-pane:hover #ytts-drag-handle {
+    color: rgba(255, 255, 255, 0.8);
   }
   .ytls-buttons {
     display: flex;
@@ -658,7 +979,8 @@
     padding: 16px 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
-  .ytts-settings-footer button {
+  .ytts-settings-footer button,
+  #ytts-reset-position {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -668,9 +990,14 @@
     cursor: pointer;
     transition: all 0.2s ease;
   }
-  .ytts-settings-footer button:hover {
+  .ytts-settings-footer button:hover,
+  #ytts-reset-position:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.5);
+  }
+  #ytts-reset-position {
+    display: block;
+    margin-top: 16px;
   }
   .ytts-settings-version {
     display: flex;
@@ -812,6 +1139,7 @@
             deleteSelectedBtn.textContent = `Delete Selected (${selectedCount})`;
             deleteSelectedBtn.disabled = selectedCount === 0;
           }
+          drag.refresh();
         },
         /**
          * Cria e injeta o painel flutuante principal no `document.body`.
@@ -824,6 +1152,10 @@
           pane.id = "ytls-pane";
           const header = document.createElement("div");
           header.className = "ytls-header";
+          const dragHandle = document.createElement("span");
+          dragHandle.id = "ytts-drag-handle";
+          dragHandle.textContent = "\u283F";
+          dragHandle.title = "Drag to move";
           const selectAllBox = document.createElement("input");
           selectAllBox.type = "checkbox";
           selectAllBox.id = "ytts-select-all";
@@ -858,11 +1190,13 @@
               minimizeBtn.textContent = "\u{1F53D}";
               minimizeBtn.title = "Minimize";
             }
+            drag.refresh();
           };
           minimizeBtn.addEventListener("click", () => {
             setMinimized(!pane.classList.contains("minimized"));
           });
           exitBtn.addEventListener("click", handlers.closePane);
+          header.appendChild(dragHandle);
           header.appendChild(selectAllBox);
           header.appendChild(settingsBtn);
           header.appendChild(minimizeBtn);
@@ -911,6 +1245,7 @@
           pane.appendChild(style);
           document.body.appendChild(pane);
           elements.pane = pane;
+          drag.init(pane, header);
           handlers.watchTime();
           setTimeout(() => {
             handlers.loadSavedTimestamps();
@@ -969,6 +1304,14 @@
           labelMinimized.appendChild(checkboxMinimized);
           labelMinimized.appendChild(spanMinimized);
           body.appendChild(labelMinimized);
+          const resetPositionBtn = document.createElement("button");
+          resetPositionBtn.id = "ytts-reset-position";
+          resetPositionBtn.textContent = "Reset widget position";
+          resetPositionBtn.addEventListener("click", () => {
+            drag.resetPosition();
+            showNotification("\u21A9\uFE0F Widget position reset");
+          });
+          body.appendChild(resetPositionBtn);
           const footer = document.createElement("div");
           footer.className = "ytts-settings-footer";
           const versionEl = document.createElement("div");
@@ -1290,6 +1633,7 @@
       cancelAnimationFrame(state.nowid);
       state.nowid = null;
     }
+    drag.destroy();
     if (elements.pane) {
       elements.pane.remove();
       elements.pane = null;
@@ -1317,6 +1661,7 @@
   var init_lifecycle = __esm({
     "src/lifecycle.js"() {
       init_state();
+      init_drag();
       init_progressMarkers();
       init_handlers();
       init_ui();
