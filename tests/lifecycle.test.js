@@ -13,27 +13,17 @@ import { createPane, resetEnvironment, stubVideo } from "./helpers/dom.js";
 
 const atUrl = (href) => vi.stubGlobal("location", { href, search: "" });
 
-// initTimestampManager leaves a MutationObserver running whenever the <video>
-// never shows up; keep a handle on each one so tests can disconnect it.
-const RealMutationObserver = globalThis.MutationObserver;
-const observers = [];
-
+// A pending observer now lives in `state.observer`, so tests reach it through
+// state instead of shadowing MutationObserver to collect handles. It has to be
+// disconnected here and not only in resetEnvironment(): the last test of the
+// file has no next beforeEach, and its observer would fire after jsdom is gone.
 beforeEach(() => {
   resetEnvironment();
-  vi.stubGlobal(
-    "MutationObserver",
-    class extends RealMutationObserver {
-      constructor(callback) {
-        super(callback);
-        observers.push(this);
-      }
-    },
-  );
 });
 
 afterEach(() => {
-  observers.forEach((observer) => observer.disconnect());
-  observers.length = 0;
+  state.observer?.disconnect();
+  state.observer = null;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -89,6 +79,22 @@ describe("cleanupTimestampManager", () => {
 
     cleanupTimestampManager();
     expect(destroy).toHaveBeenCalled();
+  });
+
+  // Armed on a page whose <video> never showed up, the observer would fire on
+  // any later mutation and mount a pane the navigation never asked for.
+  it("disconnects the observer left waiting for the video", async () => {
+    atUrl("https://www.youtube.com/watch?v=abc");
+    const initSpy = vi.spyOn(ui, "init").mockImplementation(() => {});
+    initTimestampManager();
+    expect(state.observer).not.toBeNull();
+
+    cleanupTimestampManager();
+    expect(state.observer).toBeNull();
+
+    document.body.appendChild(document.createElement("video"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(initSpy).not.toHaveBeenCalled();
   });
 
   it("clears the cached video and video id so the next page re-resolves them", () => {
@@ -158,6 +164,20 @@ describe("initTimestampManager", () => {
     document.body.appendChild(document.createElement("div"));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(initSpy).toHaveBeenCalledOnce();
+  });
+
+  // The path that stacked panes: leave a watch page before its <video> loads,
+  // come back to another one, and the first observer was still armed.
+  it("does not let an observer from an earlier page mount a second pane", async () => {
+    initTimestampManager();
+    atUrl("https://www.youtube.com/feed/subscriptions");
+    initTimestampManager();
+
+    atUrl("https://www.youtube.com/watch?v=xyz");
+    document.body.appendChild(document.createElement("video"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(initSpy).not.toHaveBeenCalled();
   });
 
   it("does not mount if navigation left the video page while waiting", async () => {

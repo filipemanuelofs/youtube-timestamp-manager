@@ -20,13 +20,23 @@ export function shouldShowTimestampManager() {
 
 /**
  * Encerra e remove o gerenciador de timestamps da página.
- * Cancela o loop de animação, desliga o arraste do painel, remove o painel do DOM,
- * destrói os marcadores de progresso e limpa todas as referências de estado.
+ * Cancela o loop de animação, desarma o observer à espera do vídeo, desliga o
+ * arraste do painel, remove o painel do DOM, destrói os marcadores de progresso
+ * e limpa todas as referências de estado.
  */
 export function cleanupTimestampManager() {
   if (state.nowid) {
     cancelAnimationFrame(state.nowid);
     state.nowid = null;
+  }
+
+  // Observer que ainda não viu o <video> da página anterior. Deixado vivo, ele
+  // continua armado e monta um segundo painel na primeira mutação depois que a
+  // navegação já montou o dele — com um segundo loop de `watchTime` junto,
+  // porque `state.nowid` seria sobrescrito sem o primeiro ser cancelado.
+  if (state.observer) {
+    state.observer.disconnect();
+    state.observer = null;
   }
 
   drag.destroy();
@@ -58,11 +68,12 @@ export function initTimestampManager() {
     return;
   }
 
-  const observer = new MutationObserver((_, obs) => {
+  state.observer = new MutationObserver((_, obs) => {
     if (document.querySelector("video") && shouldShowTimestampManager()) {
       obs.disconnect();
+      state.observer = null;
       ui.init();
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  state.observer.observe(document.body, { childList: true, subtree: true });
 }

@@ -36,7 +36,10 @@
       state = {
         nowid: null,
         videoId: null,
-        currentUrl: location.href
+        currentUrl: location.href,
+        // MutationObserver à espera do <video>, quando há um. Fica aqui porque quem
+        // o desarma é o cleanup, não o próprio init que o criou.
+        observer: null
       };
     }
   });
@@ -1633,6 +1636,10 @@
       cancelAnimationFrame(state.nowid);
       state.nowid = null;
     }
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
     drag.destroy();
     if (elements.pane) {
       elements.pane.remove();
@@ -1650,13 +1657,14 @@
       ui.init();
       return;
     }
-    const observer = new MutationObserver((_, obs) => {
+    state.observer = new MutationObserver((_, obs) => {
       if (document.querySelector("video") && shouldShowTimestampManager()) {
         obs.disconnect();
+        state.observer = null;
         ui.init();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    state.observer.observe(document.body, { childList: true, subtree: true });
   }
   var init_lifecycle = __esm({
     "src/lifecycle.js"() {

@@ -83,13 +83,19 @@ export function stubVideoId(videoId) {
   state.videoId = videoId;
 }
 
-/** Clears DOM, module-level caches and localStorage between tests. */
+/**
+ * Clears DOM, module-level caches and localStorage between tests. The observer
+ * is disconnected, not just dropped: `initTimestampManager()` arms one whenever
+ * the `<video>` is missing, and a live one would keep firing into the next test.
+ */
 export function resetEnvironment() {
   document.body.replaceChildren();
   elements.video = null;
   elements.pane = null;
   state.videoId = null;
   state.nowid = null;
+  state.observer?.disconnect();
+  state.observer = null;
   localStorage.clear();
 }
 
