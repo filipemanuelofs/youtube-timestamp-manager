@@ -654,7 +654,9 @@
   function loadTimestamps(videoId) {
     try {
       const data = localStorage.getItem(`${PREFIX}${videoId}`);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       console.error("[YT Timestamp Manager] Failed to load timestamps:", error);
       return [];
@@ -678,6 +680,7 @@
           const data = localStorage.getItem(key);
           if (data) {
             const timestamps = JSON.parse(data);
+            if (!Array.isArray(timestamps)) continue;
             const valid = timestamps.filter(
               (ts) => !ts.expiration || ts.expiration > now
             );

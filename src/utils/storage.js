@@ -22,7 +22,13 @@ export function saveTimestamps(videoId, timestamps) {
 export function loadTimestamps(videoId) {
   try {
     const data = localStorage.getItem(`${PREFIX}${videoId}`);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    // O prefixo `ytts_` também cobre as chaves de configuração
+    // (`ytts_auto_cleanup`, `ytts_start_minimized`, `ytts_pane_position`), cujos
+    // valores não são arrays. Quem varre o storage por prefixo cai nelas, então
+    // a guarda mora aqui, no ponto onde o JSON vira dado.
+    return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
     console.error("[YT Timestamp Manager] Failed to load timestamps:", error);
     return [];
@@ -83,6 +89,13 @@ export function removeExpiredFromStorage() {
         const data = localStorage.getItem(key);
         if (data) {
           const timestamps = JSON.parse(data);
+
+          // Sem esta guarda, `ytts_auto_cleanup` (que vira `true`) e
+          // `ytts_pane_position` (que vira objeto) chegam aqui sem `.filter`; o
+          // TypeError cai no catch de fora e aborta a varredura inteira, então
+          // os vídeos ainda não visitados no laço nunca são limpos.
+          if (!Array.isArray(timestamps)) continue;
+
           const valid = timestamps.filter(
             (ts) => !ts.expiration || ts.expiration > now,
           );

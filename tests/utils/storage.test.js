@@ -52,6 +52,14 @@ describe("getAllSavedVideos", () => {
     saveTimestamps("vid1", [{ time: 10 }]);
     expect(getAllSavedVideos()).toHaveLength(1);
   });
+
+  it("ignores the ytts_ config keys, which are not arrays", () => {
+    saveTimestamps("vid1", [{ time: 10 }]);
+    localStorage.setItem("ytts_auto_cleanup", "true");
+    localStorage.setItem("ytts_start_minimized", "false");
+    localStorage.setItem("ytts_pane_position", JSON.stringify({ top: 1, left: 2 }));
+    expect(getAllSavedVideos().map((v) => v.videoId)).toEqual(["vid1"]);
+  });
 });
 
 describe("deleteVideoTimestamps", () => {
@@ -116,6 +124,26 @@ describe("removeExpiredFromStorage", () => {
     const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
     expect(cleanedCount).toBe(2);
     expect(affectedVideoIds.sort()).toEqual(["vid1", "vid2"]);
+  });
+
+  // O laço varre do índice mais alto para o mais baixo, então as chaves de
+  // configuração gravadas depois dos vídeos são as primeiras a ser lidas: antes
+  // da guarda, o TypeError delas abortava a passagem e nenhum vídeo era limpo.
+  it("sweeps every video even with the ytts_ config keys present", () => {
+    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveTimestamps("vid2", [{ time: 20, expiration: past }]);
+    localStorage.setItem("ytts_auto_cleanup", "true");
+    localStorage.setItem("ytts_start_minimized", "false");
+    localStorage.setItem("ytts_pane_position", JSON.stringify({ top: 1, left: 2 }));
+
+    const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
+
+    expect(cleanedCount).toBe(2);
+    expect(affectedVideoIds.sort()).toEqual(["vid1", "vid2"]);
+    expect(localStorage.getItem("ytts_auto_cleanup")).toBe("true");
+    expect(localStorage.getItem("ytts_pane_position")).toBe(
+      JSON.stringify({ top: 1, left: 2 }),
+    );
   });
 
   it("leaves non-ytts_ keys alone", () => {
