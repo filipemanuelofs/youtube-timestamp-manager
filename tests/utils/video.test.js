@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { elements, state } from "../../src/state.js";
-import { getVideoId, getVideo } from "../../src/utils/video.js";
+import {
+  getVideoId,
+  getVideo,
+  getVideoTitle,
+} from "../../src/utils/video.js";
 
 describe("getVideoId", () => {
   beforeEach(() => {
@@ -110,5 +114,61 @@ describe("getVideo", () => {
 
   it("returns null if no video in DOM", () => {
     expect(getVideo()).toBeNull();
+  });
+});
+
+describe("getVideoTitle", () => {
+  const original = document.title;
+  afterEach(() => {
+    document.title = original;
+  });
+
+  it("strips the notification prefix and the ' - YouTube' suffix", () => {
+    document.title = "(3) Meu Vídeo - YouTube";
+    expect(getVideoTitle()).toBe("Meu Vídeo");
+  });
+
+  it("strips the suffix when there is no notification prefix", () => {
+    document.title = "Meu Vídeo - YouTube";
+    expect(getVideoTitle()).toBe("Meu Vídeo");
+  });
+
+  it("keeps a title that carries neither", () => {
+    document.title = "Meu Vídeo";
+    expect(getVideoTitle()).toBe("Meu Vídeo");
+  });
+
+  it("keeps a dash that belongs to the title itself", () => {
+    document.title = "Artista - Música - YouTube";
+    expect(getVideoTitle()).toBe("Artista - Música");
+  });
+
+  it("returns '' when nothing is left", () => {
+    document.title = " - YouTube";
+    expect(getVideoTitle()).toBe("");
+  });
+
+  // Título da aba antes de a página hidratar. Sem hífen, o sufixo não casa.
+  it("returns '' for the bare 'YouTube' title", () => {
+    document.title = "YouTube";
+    expect(getVideoTitle()).toBe("");
+  });
+
+  it("returns '' for 'YouTube' behind a notification prefix", () => {
+    document.title = "(3) YouTube";
+    expect(getVideoTitle()).toBe("");
+  });
+
+  // Falso positivo aceito: um vídeo de fato chamado "YouTube" perde o título e
+  // cai no ID na lista. Trocar um título errado por um ID sai mais barato que o
+  // contrário, e o caso do título literal é bem mais comum que o do vídeo.
+  it("also drops a video genuinely named YouTube", () => {
+    document.title = "YouTube - YouTube";
+    expect(getVideoTitle()).toBe("");
+  });
+
+  it("returns '' for an empty document title", () => {
+    document.title = "";
+    expect(getVideoTitle()).toBe("");
   });
 });

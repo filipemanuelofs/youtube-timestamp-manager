@@ -76,11 +76,16 @@ export function createProgressBar() {
 }
 
 /**
- * Points `getVideoId()` at a fixed id by seeding its cache.
+ * Points `getVideoId()` at a fixed id by seeding its cache, and stamps the pane
+ * with it so `saveCurrentTimestamps` sees the two agreeing. `createPane()` runs
+ * before this in the suites, so the stamp has to be applied from here.
  * @param {string} videoId
  */
 export function stubVideoId(videoId) {
   state.videoId = videoId;
+  if (elements.pane) {
+    elements.pane.dataset.videoId = videoId;
+  }
 }
 
 /**

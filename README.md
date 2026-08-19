@@ -118,6 +118,20 @@ no need to press Save.
 Both settings are stored locally and persist across sessions, and so is the panel
 position.
 
+## 🎬 Saved videos
+
+The settings modal has a second tab, **Videos**, listing every video that still
+has timestamps saved — thumbnail, title and how many timestamps it holds, newest
+first. The title opens the video in a new tab, and ⛔ wipes every timestamp of
+that video after a confirmation.
+
+Titles are captured the moment timestamps are saved, so a video saved before this
+feature existed shows its video ID until you open it again and edit its
+timestamps.
+
+The tab lives inside the panel, so it is reachable from a video page (`/watch`,
+`/live/`, `/shorts/`) — not from the YouTube home page.
+
 ### Supported Sites
 
 - ✅ `youtube.com/watch` - Regular videos

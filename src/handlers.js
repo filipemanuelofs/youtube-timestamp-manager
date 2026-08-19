@@ -1,6 +1,6 @@
 import { state } from "./state.js";
 import { formatTime } from "./utils/time.js";
-import { getVideoId, getVideo } from "./utils/video.js";
+import { getVideoId, getVideo, getVideoTitle } from "./utils/video.js";
 import { copyToClipboard, showCopyFeedback } from "./utils/clipboard.js";
 import { showNotification } from "./utils/notification.js";
 import {
@@ -8,6 +8,7 @@ import {
   loadTimestamps,
   removeExpiredFromStorage,
   deleteVideoTimestamps,
+  saveVideoTitle,
 } from "./utils/storage.js";
 import { progressMarkers } from "./progressMarkers.js";
 // ui e lifecycle importados aqui — usados apenas dentro de funções (não no nível do módulo),
@@ -158,6 +159,40 @@ export const handlers = {
   },
 
   /**
+   * Apaga todos os timestamps de um vídeo a partir da lista da aba "Videos",
+   * após confirmação do usuário.
+   * @param {string} videoId - ID do vídeo a apagar.
+   * @param {HTMLLIElement} li - Item da lista que representa o vídeo.
+   */
+  deleteVideoFromList(videoId, li) {
+    if (!confirm("Delete all timestamps of this video?")) return;
+
+    deleteVideoTimestamps(videoId);
+
+    // O vídeo apagado é o que está aberto: sem esvaziar o painel ele segue
+    // exibindo timestamps que não existem mais, e o próximo
+    // `saveCurrentTimestamps` os ressuscita no storage.
+    if (videoId === getVideoId()) {
+      document
+        .querySelectorAll("#ytls-pane ul li:not(.now-playing)")
+        .forEach((item) => item.remove());
+      progressMarkers.updateMarkers();
+      ui.updateSelectionUI();
+    }
+
+    const list = li.parentElement;
+    const container = list && list.parentElement;
+    li.remove();
+
+    // Lista esvaziada: re-renderizar para cair no estado vazio.
+    if (container && list.children.length === 0) {
+      ui.renderVideoList(container);
+    }
+
+    showNotification("🗑️ Video timestamps deleted!");
+  },
+
+  /**
    * Handler `unload`: sem efeito no browser (evento não suporta diálogo de confirmação).
    * Mantido em `unload` (não `beforeunload`) de propósito para não exibir popup ao fechar a aba.
    * @param {Event} e - Evento de descarregamento da página.
@@ -179,6 +214,14 @@ export const handlers = {
     const videoId = getVideoId();
     if (!videoId) return;
 
+    // A navegação SPA troca a URL e só remonta o painel 100ms depois, e o painel
+    // novo passa 1s vazio antes de `loadSavedTimestamps` rodar. O save com
+    // debounce da nota (500ms) cai bem nessa janela: `getVideoId()` já devolve o
+    // vídeo novo enquanto a lista está vazia, e o `else` abaixo apagaria os
+    // timestamps salvos dele. O carimbo do painel diz de quem é a lista lida.
+    const pane = document.querySelector("#ytls-pane");
+    if (!pane || pane.dataset.videoId !== videoId) return;
+
     const listItems = document.querySelectorAll(
       "#ytls-pane ul li:not(.now-playing)",
     );
@@ -194,6 +237,7 @@ export const handlers = {
 
     if (timestamps.length > 0) {
       saveTimestamps(videoId, timestamps);
+      saveVideoTitle(videoId, getVideoTitle());
     } else {
       deleteVideoTimestamps(videoId);
     }

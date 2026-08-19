@@ -46,6 +46,11 @@ export function cleanupTimestampManager() {
     elements.pane = null;
   }
 
+  // O modal vive no `body`, fora do painel, então sobreviveria à navegação: fica
+  // órfão sobre a página nova com a lista de vídeos velha, e `openSettingsModal`
+  // desiste enquanto ele existir — o ⚙️ do painel novo pararia de responder.
+  document.querySelector("#ytts-settings-modal")?.remove();
+
   progressMarkers.destroy();
 
   window.removeEventListener("unload", handlers.warn);

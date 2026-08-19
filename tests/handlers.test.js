@@ -5,7 +5,11 @@ import { progressMarkers } from "../src/progressMarkers.js";
 import { state } from "../src/state.js";
 import * as clipboard from "../src/utils/clipboard.js";
 import * as notification from "../src/utils/notification.js";
-import { saveTimestamps, loadTimestamps } from "../src/utils/storage.js";
+import {
+  saveTimestamps,
+  loadTimestamps,
+  loadVideoTitle,
+} from "../src/utils/storage.js";
 import {
   createPane,
   readListItems,
@@ -331,6 +335,43 @@ describe("saveCurrentTimestamps", () => {
     handlers.saveCurrentTimestamps();
     expect(progressMarkers.updateMarkers).toHaveBeenCalled();
   });
+
+  // A navegação SPA move a URL antes de remontar o painel, e o painel novo passa
+  // 1s vazio. Um save com debounce pendente que caia nessa janela lê a lista de
+  // um vídeo com o ID do outro.
+  it("does not wipe the next video while the pane still belongs to the old one", () => {
+    saveTimestamps("vid2", [
+      { time: 10, note: "b", creation: past, expiration: future },
+    ]);
+    ui.createTimestampItem(15, "a", past, future);
+    state.videoId = "vid2";
+
+    handlers.saveCurrentTimestamps();
+
+    expect(loadTimestamps("vid2")).toEqual([
+      { time: 10, note: "b", creation: past, expiration: future },
+    ]);
+    expect(loadTimestamps("vid1")).toEqual([]);
+  });
+
+  it("does not drop the next video key when the fresh pane is still empty", () => {
+    saveTimestamps("vid2", [
+      { time: 10, note: "b", creation: past, expiration: future },
+    ]);
+    localStorage.setItem("yttsmeta_vid2", JSON.stringify({ title: "Dois" }));
+    state.videoId = "vid2";
+
+    handlers.saveCurrentTimestamps();
+
+    expect(loadTimestamps("vid2")).toHaveLength(1);
+    expect(loadVideoTitle("vid2")).toBe("Dois");
+  });
+
+  it("no-ops without a pane", () => {
+    document.querySelector("#ytls-pane").remove();
+    handlers.saveCurrentTimestamps();
+    expect(loadTimestamps("vid1")).toEqual([]);
+  });
 });
 
 describe("loadSavedTimestamps", () => {
@@ -475,5 +516,112 @@ describe("closePane", () => {
     vi.stubGlobal("confirm", vi.fn(() => false));
     handlers.closePane();
     expect(document.querySelector("#ytls-pane")).not.toBeNull();
+  });
+});
+
+describe("saveCurrentTimestamps title", () => {
+  const originalTitle = document.title;
+  afterEach(() => {
+    document.title = originalTitle;
+  });
+
+  it("stores the page title alongside the timestamps", () => {
+    document.title = "(3) Meu Vídeo - YouTube";
+    ui.createTimestampItem(10, "nota");
+
+    handlers.saveCurrentTimestamps();
+    expect(loadVideoTitle("vid1")).toBe("Meu Vídeo");
+  });
+
+  it("does not store a title when the list ends up empty", () => {
+    document.title = "Meu Vídeo - YouTube";
+    handlers.saveCurrentTimestamps();
+    expect(localStorage.getItem("yttsmeta_vid1")).toBeNull();
+  });
+});
+
+describe("deleteVideoFromList", () => {
+  const stamp = (creation) => ({
+    time: 10,
+    note: "",
+    creation,
+    expiration: future,
+  });
+
+  let container;
+
+  const renderList = () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    ui.renderVideoList(container);
+    return container;
+  };
+
+  const deleteBtnFor = (videoId) =>
+    container.querySelector(`[data-video-id="${videoId}"] .ytts-icon-btn`);
+
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("drops the video from storage and from the list", () => {
+    saveTimestamps("other", [stamp(past)]);
+    localStorage.setItem("yttsmeta_other", JSON.stringify({ title: "Outro" }));
+    saveTimestamps("vid1", [stamp(past)]);
+    renderList();
+
+    deleteBtnFor("other").click();
+
+    expect(localStorage.getItem("ytts_other")).toBeNull();
+    expect(localStorage.getItem("yttsmeta_other")).toBeNull();
+    expect(container.querySelectorAll(".ytts-video-item").length).toBe(1);
+    expect(loadTimestamps("vid1")).toHaveLength(1);
+    expect(notifySpy).toHaveBeenCalledWith("🗑️ Video timestamps deleted!");
+  });
+
+  it("keeps everything when the confirm is declined", () => {
+    saveTimestamps("other", [stamp(past)]);
+    renderList();
+
+    window.confirm.mockReturnValue(false);
+    deleteBtnFor("other").click();
+
+    expect(loadTimestamps("other")).toHaveLength(1);
+    expect(container.querySelectorAll(".ytts-video-item").length).toBe(1);
+  });
+
+  it("falls back to the empty state once the last video goes", () => {
+    saveTimestamps("other", [stamp(past)]);
+    renderList();
+
+    deleteBtnFor("other").click();
+
+    expect(container.querySelector(".ytts-video-empty")).not.toBeNull();
+    expect(container.querySelectorAll(".ytts-video-item").length).toBe(0);
+  });
+
+  it("clears the pane when the deleted video is the one playing", () => {
+    ui.createTimestampItem(10, "nota");
+    ui.createTimestampItem(20, "outra");
+    handlers.saveCurrentTimestamps();
+    renderList();
+
+    deleteBtnFor("vid1").click();
+
+    expect(readListItems()).toEqual([]);
+    expect(progressMarkers.updateMarkers).toHaveBeenCalled();
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
+  });
+
+  it("leaves the pane alone when the deleted video is another one", () => {
+    ui.createTimestampItem(10, "nota");
+    handlers.saveCurrentTimestamps();
+    saveTimestamps("other", [stamp(past)]);
+    renderList();
+
+    deleteBtnFor("other").click();
+
+    expect(readListItems()).toHaveLength(1);
+    expect(loadTimestamps("vid1")).toHaveLength(1);
   });
 });

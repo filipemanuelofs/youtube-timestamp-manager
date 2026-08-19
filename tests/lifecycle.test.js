@@ -71,6 +71,39 @@ describe("cleanupTimestampManager", () => {
     expect(destroy).toHaveBeenCalled();
   });
 
+  // O modal está no `body`, não dentro do painel, então sair junto não é de graça.
+  it("takes the settings modal down with the pane", () => {
+    createPane();
+    ui.openSettingsModal();
+    expect(document.querySelector("#ytts-settings-modal")).not.toBeNull();
+
+    cleanupTimestampManager();
+    expect(document.querySelector("#ytts-settings-modal")).toBeNull();
+  });
+
+  // Deixado para trás, o modal órfão travaria o ⚙️ do painel seguinte, porque
+  // openSettingsModal desiste quando já existe um na página.
+  it("lets the settings modal open again after a navigation", () => {
+    createPane();
+    ui.openSettingsModal();
+    const stale = document.querySelector("#ytts-settings-modal");
+    cleanupTimestampManager();
+
+    createPane();
+    ui.openSettingsModal();
+    const fresh = document.querySelector("#ytts-settings-modal");
+
+    // Não basta haver um modal: o órfão preso na página também satisfaria isso,
+    // e é justamente ele que faz openSettingsModal desistir. Tem de ser outro.
+    expect(fresh).not.toBeNull();
+    expect(fresh).not.toBe(stale);
+  });
+
+  it("no-ops when no modal is open", () => {
+    createPane();
+    expect(() => cleanupTimestampManager()).not.toThrow();
+  });
+
   // Every SPA navigation runs cleanup then init; without this the drag module
   // would stack one resize listener per visited video.
   it("shuts the drag module down", () => {

@@ -4,6 +4,8 @@ import { drag } from "./drag.js";
 import { showNotification } from "./utils/notification.js";
 import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
+import { getAllSavedVideos } from "./utils/storage.js";
+import { getVideoId } from "./utils/video.js";
 
 // Acima desta quantidade de timestamps a UI de seleção múltipla aparece.
 const SELECTION_MIN_COUNT = 3;
@@ -325,6 +327,78 @@ const STYLES = `
     background: #81D4FA;
     border-color: #81D4FA;
   }
+  .ytts-tabs {
+    display: flex;
+    padding: 0 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .ytts-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .ytts-tab:hover {
+    color: white;
+  }
+  .ytts-tab-active {
+    color: white;
+    border-bottom-color: #4FC3F7;
+  }
+  #ytts-tab-videos {
+    width: 420px;
+    max-width: 100%;
+  }
+  .ytts-video-empty {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+  }
+  .ytts-video-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .ytts-video-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+  .ytts-video-item + .ytts-video-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .ytts-video-item img {
+    width: 80px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex: 0 0 auto;
+  }
+  .ytts-video-title {
+    flex: 1;
+    min-width: 0;
+    color: white;
+    font-size: 13px;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ytts-video-title:hover {
+    color: #4FC3F7;
+  }
+  .ytts-video-count {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    flex: 0 0 auto;
+  }
   .ytts-icon-btn {
     font-size: 14px;
     line-height: 1;
@@ -468,6 +542,10 @@ export const ui = {
   init() {
     const pane = document.createElement("div");
     pane.id = "ytls-pane";
+    // Carimba o vídeo dono do painel. A navegação SPA troca a URL antes de
+    // remontar o painel, então `saveCurrentTimestamps` compara os dois e se cala
+    // enquanto eles não batem.
+    pane.dataset.videoId = getVideoId();
 
     const header = document.createElement("div");
     header.className = "ytls-header";
@@ -638,8 +716,32 @@ export const ui = {
     header.appendChild(title);
     header.appendChild(closeBtn);
 
+    const tabs = document.createElement("div");
+    tabs.className = "ytts-tabs";
+
+    const settingsTabBtn = document.createElement("button");
+    settingsTabBtn.className = "ytts-tab ytts-tab-active";
+    settingsTabBtn.textContent = "Settings";
+
+    const videosTabBtn = document.createElement("button");
+    videosTabBtn.className = "ytts-tab";
+    videosTabBtn.textContent = "Videos";
+
+    tabs.appendChild(settingsTabBtn);
+    tabs.appendChild(videosTabBtn);
+
     const body = document.createElement("div");
     body.className = "ytts-settings-body";
+
+    const settingsTab = document.createElement("div");
+    settingsTab.id = "ytts-tab-settings";
+
+    const videosTab = document.createElement("div");
+    videosTab.id = "ytts-tab-videos";
+    videosTab.style.display = "none";
+
+    body.appendChild(settingsTab);
+    body.appendChild(videosTab);
 
     const label = document.createElement("label");
     label.className = "ytts-setting-item";
@@ -661,7 +763,7 @@ export const ui = {
 
     label.appendChild(checkbox);
     label.appendChild(span);
-    body.appendChild(label);
+    settingsTab.appendChild(label);
 
     const labelMinimized = document.createElement("label");
     labelMinimized.className = "ytts-setting-item";
@@ -677,7 +779,7 @@ export const ui = {
 
     labelMinimized.appendChild(checkboxMinimized);
     labelMinimized.appendChild(spanMinimized);
-    body.appendChild(labelMinimized);
+    settingsTab.appendChild(labelMinimized);
 
     // Ação, não preferência: age no clique e não passa pelo Save.
     const resetPositionBtn = document.createElement("button");
@@ -689,7 +791,7 @@ export const ui = {
       showNotification("↩️ Widget position reset");
     });
 
-    body.appendChild(resetPositionBtn);
+    settingsTab.appendChild(resetPositionBtn);
 
     const footer = document.createElement("div");
     footer.className = "ytts-settings-footer";
@@ -738,10 +840,25 @@ export const ui = {
     footer.appendChild(cancelBtn);
 
     content.appendChild(header);
+    content.appendChild(tabs);
     content.appendChild(body);
     content.appendChild(footer);
     modal.appendChild(content);
     document.body.appendChild(modal);
+
+    // Save grava preferência, e a aba de vídeos não tem preferência a gravar:
+    // some junto com o conteúdo de Settings.
+    const showVideosTab = (videos) => {
+      settingsTab.style.display = videos ? "none" : "";
+      videosTab.style.display = videos ? "" : "none";
+      settingsTabBtn.classList.toggle("ytts-tab-active", !videos);
+      videosTabBtn.classList.toggle("ytts-tab-active", videos);
+      saveBtn.style.display = videos ? "none" : "";
+      if (videos) ui.renderVideoList(videosTab);
+    };
+
+    settingsTabBtn.addEventListener("click", () => showVideosTab(false));
+    videosTabBtn.addEventListener("click", () => showVideosTab(true));
 
     closeBtn.addEventListener("click", () => modal.remove());
     cancelBtn.addEventListener("click", () => modal.remove());
@@ -750,6 +867,82 @@ export const ui = {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) modal.remove();
     });
+  },
+
+  /**
+   * Renderiza no container a lista de vídeos com timestamps salvos.
+   * Ordena pelo timestamp criado mais recentemente em cada vídeo, do mais novo
+   * para o mais antigo; entrada legada sem `creation` cai no fim.
+   * @param {HTMLElement} container - Elemento que recebe a lista.
+   */
+  renderVideoList(container) {
+    container.replaceChildren();
+
+    const videos = getAllSavedVideos();
+
+    if (videos.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "ytts-video-empty";
+      empty.textContent = "No videos with timestamps yet.";
+      container.appendChild(empty);
+      return;
+    }
+
+    const lastCreation = ({ timestamps }) =>
+      timestamps.reduce((newest, { creation }) => {
+        const time = Date.parse(creation);
+        return Number.isNaN(time) ? newest : Math.max(newest, time);
+      }, 0);
+
+    videos.sort((a, b) => lastCreation(b) - lastCreation(a));
+
+    const list = document.createElement("ul");
+    list.className = "ytts-video-list";
+
+    videos.forEach(({ videoId, title, timestamps }) => {
+      const li = document.createElement("li");
+      li.className = "ytts-video-item";
+      li.dataset.videoId = videoId;
+
+      const thumb = document.createElement("img");
+      thumb.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+      thumb.loading = "lazy";
+      thumb.referrerPolicy = "no-referrer";
+      thumb.alt = "";
+      // Vídeo removido responde 404 na miniatura: esconder mantém a linha legível.
+      thumb.addEventListener("error", () => {
+        thumb.style.display = "none";
+      });
+
+      const link = document.createElement("a");
+      link.className = "ytts-video-title";
+      link.href = `https://youtu.be/${videoId}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = title || videoId;
+      link.title = title || videoId;
+
+      const count = document.createElement("span");
+      count.className = "ytts-video-count";
+      count.textContent = `${timestamps.length}`;
+
+      const deleteBtn = document.createElement("span");
+      deleteBtn.classList.add("ytts-icon-btn");
+      deleteBtn.title = "Delete all timestamps of this video";
+      deleteBtn.textContent = "⛔";
+
+      deleteBtn.addEventListener("click", () => {
+        handlers.deleteVideoFromList(videoId, li);
+      });
+
+      li.appendChild(thumb);
+      li.appendChild(link);
+      li.appendChild(count);
+      li.appendChild(deleteBtn);
+      list.appendChild(li);
+    });
+
+    container.appendChild(list);
   },
 
   /**

@@ -363,6 +363,10 @@
     }
     return elements.video;
   }
+  function getVideoTitle() {
+    const title = (document.title || "").replace(/^\(\d+\)\s*/, "").replace(/\s*-\s*YouTube$/, "").trim();
+    return title === "YouTube" ? "" : title;
+  }
   var init_video = __esm({
     "src/utils/video.js"() {
       init_state();
@@ -662,17 +666,63 @@
       return [];
     }
   }
+  function saveVideoTitle(videoId, title) {
+    if (!title) return;
+    try {
+      localStorage.setItem(`${META_PREFIX}${videoId}`, JSON.stringify({ title }));
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to save video title:", error);
+    }
+  }
+  function loadVideoTitle(videoId) {
+    try {
+      const data = localStorage.getItem(`${META_PREFIX}${videoId}`);
+      if (!data) return "";
+      const parsed = JSON.parse(data);
+      return parsed && typeof parsed.title === "string" ? parsed.title : "";
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to load video title:", error);
+      return "";
+    }
+  }
+  function deleteVideoTitle(videoId) {
+    try {
+      localStorage.removeItem(`${META_PREFIX}${videoId}`);
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to delete video title:", error);
+    }
+  }
+  function getAllSavedVideos() {
+    const videos = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(PREFIX)) {
+          const videoId = key.replace(PREFIX, "");
+          const timestamps = loadTimestamps(videoId);
+          if (timestamps.length > 0) {
+            videos.push({ videoId, title: loadVideoTitle(videoId), timestamps });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to get saved videos:", error);
+    }
+    return videos;
+  }
   function deleteVideoTimestamps(videoId) {
     try {
       localStorage.removeItem(`${PREFIX}${videoId}`);
     } catch (error) {
       console.error("[YT Timestamp Manager] Failed to delete timestamps:", error);
     }
+    deleteVideoTitle(videoId);
   }
   function removeExpiredFromStorage() {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     let cleanedCount = 0;
     const affectedVideoIds = [];
+    const emptiedVideoIds = [];
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
@@ -685,12 +735,14 @@
               (ts) => !ts.expiration || ts.expiration > now
             );
             if (valid.length !== timestamps.length) {
+              const videoId = key.replace(PREFIX, "");
               cleanedCount += timestamps.length - valid.length;
-              affectedVideoIds.push(key.replace(PREFIX, ""));
+              affectedVideoIds.push(videoId);
               if (valid.length > 0) {
                 localStorage.setItem(key, JSON.stringify(valid));
               } else {
                 localStorage.removeItem(key);
+                emptiedVideoIds.push(videoId);
               }
             }
           }
@@ -702,12 +754,14 @@
         error
       );
     }
+    emptiedVideoIds.forEach((videoId) => deleteVideoTitle(videoId));
     return { cleanedCount, affectedVideoIds };
   }
-  var PREFIX;
+  var PREFIX, META_PREFIX;
   var init_storage = __esm({
     "src/utils/storage.js"() {
       PREFIX = "ytts_";
+      META_PREFIX = "yttsmeta_";
     }
   });
 
@@ -721,6 +775,8 @@
       init_notification();
       init_progressMarkers();
       init_handlers();
+      init_storage();
+      init_video();
       SELECTION_MIN_COUNT = 3;
       STYLES = `
   #ytls-pane {
@@ -1039,6 +1095,78 @@
     background: #81D4FA;
     border-color: #81D4FA;
   }
+  .ytts-tabs {
+    display: flex;
+    padding: 0 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .ytts-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .ytts-tab:hover {
+    color: white;
+  }
+  .ytts-tab-active {
+    color: white;
+    border-bottom-color: #4FC3F7;
+  }
+  #ytts-tab-videos {
+    width: 420px;
+    max-width: 100%;
+  }
+  .ytts-video-empty {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+  }
+  .ytts-video-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .ytts-video-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+  .ytts-video-item + .ytts-video-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .ytts-video-item img {
+    width: 80px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex: 0 0 auto;
+  }
+  .ytts-video-title {
+    flex: 1;
+    min-width: 0;
+    color: white;
+    font-size: 13px;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ytts-video-title:hover {
+    color: #4FC3F7;
+  }
+  .ytts-video-count {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    flex: 0 0 auto;
+  }
   .ytts-icon-btn {
     font-size: 14px;
     line-height: 1;
@@ -1156,6 +1284,7 @@
         init() {
           const pane = document.createElement("div");
           pane.id = "ytls-pane";
+          pane.dataset.videoId = getVideoId();
           const header = document.createElement("div");
           header.className = "ytls-header";
           const dragHandle = document.createElement("span");
@@ -1281,8 +1410,25 @@
           closeBtn.textContent = "\xD7";
           header.appendChild(title);
           header.appendChild(closeBtn);
+          const tabs = document.createElement("div");
+          tabs.className = "ytts-tabs";
+          const settingsTabBtn = document.createElement("button");
+          settingsTabBtn.className = "ytts-tab ytts-tab-active";
+          settingsTabBtn.textContent = "Settings";
+          const videosTabBtn = document.createElement("button");
+          videosTabBtn.className = "ytts-tab";
+          videosTabBtn.textContent = "Videos";
+          tabs.appendChild(settingsTabBtn);
+          tabs.appendChild(videosTabBtn);
           const body = document.createElement("div");
           body.className = "ytts-settings-body";
+          const settingsTab = document.createElement("div");
+          settingsTab.id = "ytts-tab-settings";
+          const videosTab = document.createElement("div");
+          videosTab.id = "ytts-tab-videos";
+          videosTab.style.display = "none";
+          body.appendChild(settingsTab);
+          body.appendChild(videosTab);
           const label = document.createElement("label");
           label.className = "ytts-setting-item";
           const checkbox = document.createElement("input");
@@ -1297,7 +1443,7 @@
           span.appendChild(small);
           label.appendChild(checkbox);
           label.appendChild(span);
-          body.appendChild(label);
+          settingsTab.appendChild(label);
           const labelMinimized = document.createElement("label");
           labelMinimized.className = "ytts-setting-item";
           labelMinimized.style.marginTop = "12px";
@@ -1309,7 +1455,7 @@
           spanMinimized.textContent = "Start widget minimized";
           labelMinimized.appendChild(checkboxMinimized);
           labelMinimized.appendChild(spanMinimized);
-          body.appendChild(labelMinimized);
+          settingsTab.appendChild(labelMinimized);
           const resetPositionBtn = document.createElement("button");
           resetPositionBtn.id = "ytts-reset-position";
           resetPositionBtn.textContent = "Reset widget position";
@@ -1317,7 +1463,7 @@
             drag.resetPosition();
             showNotification("\u21A9\uFE0F Widget position reset");
           });
-          body.appendChild(resetPositionBtn);
+          settingsTab.appendChild(resetPositionBtn);
           const footer = document.createElement("div");
           footer.className = "ytts-settings-footer";
           const versionEl = document.createElement("div");
@@ -1356,16 +1502,87 @@
           footer.appendChild(saveBtn);
           footer.appendChild(cancelBtn);
           content.appendChild(header);
+          content.appendChild(tabs);
           content.appendChild(body);
           content.appendChild(footer);
           modal.appendChild(content);
           document.body.appendChild(modal);
+          const showVideosTab = (videos) => {
+            settingsTab.style.display = videos ? "none" : "";
+            videosTab.style.display = videos ? "" : "none";
+            settingsTabBtn.classList.toggle("ytts-tab-active", !videos);
+            videosTabBtn.classList.toggle("ytts-tab-active", videos);
+            saveBtn.style.display = videos ? "none" : "";
+            if (videos) ui.renderVideoList(videosTab);
+          };
+          settingsTabBtn.addEventListener("click", () => showVideosTab(false));
+          videosTabBtn.addEventListener("click", () => showVideosTab(true));
           closeBtn.addEventListener("click", () => modal.remove());
           cancelBtn.addEventListener("click", () => modal.remove());
           saveBtn.addEventListener("click", ui.saveSettings);
           modal.addEventListener("click", (e) => {
             if (e.target === modal) modal.remove();
           });
+        },
+        /**
+         * Renderiza no container a lista de vídeos com timestamps salvos.
+         * Ordena pelo timestamp criado mais recentemente em cada vídeo, do mais novo
+         * para o mais antigo; entrada legada sem `creation` cai no fim.
+         * @param {HTMLElement} container - Elemento que recebe a lista.
+         */
+        renderVideoList(container) {
+          container.replaceChildren();
+          const videos = getAllSavedVideos();
+          if (videos.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "ytts-video-empty";
+            empty.textContent = "No videos with timestamps yet.";
+            container.appendChild(empty);
+            return;
+          }
+          const lastCreation = ({ timestamps }) => timestamps.reduce((newest, { creation }) => {
+            const time = Date.parse(creation);
+            return Number.isNaN(time) ? newest : Math.max(newest, time);
+          }, 0);
+          videos.sort((a, b) => lastCreation(b) - lastCreation(a));
+          const list = document.createElement("ul");
+          list.className = "ytts-video-list";
+          videos.forEach(({ videoId, title, timestamps }) => {
+            const li = document.createElement("li");
+            li.className = "ytts-video-item";
+            li.dataset.videoId = videoId;
+            const thumb = document.createElement("img");
+            thumb.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+            thumb.loading = "lazy";
+            thumb.referrerPolicy = "no-referrer";
+            thumb.alt = "";
+            thumb.addEventListener("error", () => {
+              thumb.style.display = "none";
+            });
+            const link = document.createElement("a");
+            link.className = "ytts-video-title";
+            link.href = `https://youtu.be/${videoId}`;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = title || videoId;
+            link.title = title || videoId;
+            const count = document.createElement("span");
+            count.className = "ytts-video-count";
+            count.textContent = `${timestamps.length}`;
+            const deleteBtn = document.createElement("span");
+            deleteBtn.classList.add("ytts-icon-btn");
+            deleteBtn.title = "Delete all timestamps of this video";
+            deleteBtn.textContent = "\u26D4";
+            deleteBtn.addEventListener("click", () => {
+              handlers.deleteVideoFromList(videoId, li);
+            });
+            li.appendChild(thumb);
+            li.appendChild(link);
+            li.appendChild(count);
+            li.appendChild(deleteBtn);
+            list.appendChild(li);
+          });
+          container.appendChild(list);
         },
         /**
          * Lê a configuração de limpeza automática de timestamps expirados do localStorage.
@@ -1548,6 +1765,28 @@
           showNotification(`\u{1F5D1}\uFE0F ${count} timestamp${count > 1 ? "s" : ""} deleted!`);
         },
         /**
+         * Apaga todos os timestamps de um vídeo a partir da lista da aba "Videos",
+         * após confirmação do usuário.
+         * @param {string} videoId - ID do vídeo a apagar.
+         * @param {HTMLLIElement} li - Item da lista que representa o vídeo.
+         */
+        deleteVideoFromList(videoId, li) {
+          if (!confirm("Delete all timestamps of this video?")) return;
+          deleteVideoTimestamps(videoId);
+          if (videoId === getVideoId()) {
+            document.querySelectorAll("#ytls-pane ul li:not(.now-playing)").forEach((item) => item.remove());
+            progressMarkers.updateMarkers();
+            ui.updateSelectionUI();
+          }
+          const list = li.parentElement;
+          const container = list && list.parentElement;
+          li.remove();
+          if (container && list.children.length === 0) {
+            ui.renderVideoList(container);
+          }
+          showNotification("\u{1F5D1}\uFE0F Video timestamps deleted!");
+        },
+        /**
          * Handler `unload`: sem efeito no browser (evento não suporta diálogo de confirmação).
          * Mantido em `unload` (não `beforeunload`) de propósito para não exibir popup ao fechar a aba.
          * @param {Event} e - Evento de descarregamento da página.
@@ -1567,6 +1806,8 @@
         saveCurrentTimestamps() {
           const videoId = getVideoId();
           if (!videoId) return;
+          const pane = document.querySelector("#ytls-pane");
+          if (!pane || pane.dataset.videoId !== videoId) return;
           const listItems = document.querySelectorAll(
             "#ytls-pane ul li:not(.now-playing)"
           );
@@ -1580,6 +1821,7 @@
           });
           if (timestamps.length > 0) {
             saveTimestamps(videoId, timestamps);
+            saveVideoTitle(videoId, getVideoTitle());
           } else {
             deleteVideoTimestamps(videoId);
           }
@@ -1648,6 +1890,7 @@
       elements.pane.remove();
       elements.pane = null;
     }
+    document.querySelector("#ytts-settings-modal")?.remove();
     progressMarkers.destroy();
     window.removeEventListener("unload", handlers.warn);
     elements.video = null;

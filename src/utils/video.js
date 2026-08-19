@@ -26,3 +26,20 @@ export function getVideo() {
   }
   return elements.video;
 }
+
+/**
+ * Retorna o título do vídeo atual a partir de `document.title`.
+ * Remove o prefixo de notificação (`(3) `) e o sufixo ` - YouTube`.
+ * Não usa cache em `state`: o título muda a cada navegação SPA e reler é barato.
+ * Antes de a página hidratar, `document.title` é só `"YouTube"` — sem o hífen,
+ * o sufixo não casa e sobraria "YouTube" como título do vídeo. Vale como vazio:
+ * a lista de vídeos cai no ID, que ao menos identifica qual vídeo é.
+ * @returns {string} Título limpo ou `""` se nada de útil sobrar.
+ */
+export function getVideoTitle() {
+  const title = (document.title || "")
+    .replace(/^\(\d+\)\s*/, "")
+    .replace(/\s*-\s*YouTube$/, "")
+    .trim();
+  return title === "YouTube" ? "" : title;
+}

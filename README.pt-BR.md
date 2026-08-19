@@ -118,6 +118,20 @@ sem precisar do Save.
 As duas configurações ficam guardadas localmente e sobrevivem ao fechar o
 navegador — a posição do painel também.
 
+## 🎬 Vídeos salvos
+
+O modal de configurações tem uma segunda aba, **Videos**, que lista todo vídeo
+que ainda tem timestamps salvos — miniatura, título e quantos timestamps ele
+guarda, do mais recente para o mais antigo. O título abre o vídeo em uma aba
+nova, e o ⛔ apaga todos os timestamps daquele vídeo depois de uma confirmação.
+
+O título é capturado na hora em que os timestamps são salvos, então um vídeo
+salvo antes desta funcionalidade existir aparece com o ID do vídeo até você
+abri-lo de novo e mexer nos timestamps.
+
+A aba vive dentro do painel, então ela só é alcançável de uma página de vídeo
+(`/watch`, `/live/`, `/shorts/`) — não da home do YouTube.
+
 ### Sites suportados
 
 - ✅ `youtube.com/watch` - vídeos comuns

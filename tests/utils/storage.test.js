@@ -5,6 +5,9 @@ import {
   getAllSavedVideos,
   deleteVideoTimestamps,
   removeExpiredFromStorage,
+  saveVideoTitle,
+  loadVideoTitle,
+  deleteVideoTitle,
 } from "../../src/utils/storage.js";
 
 const past = new Date(Date.now() - 1000).toISOString();
@@ -27,6 +30,46 @@ describe("saveTimestamps / loadTimestamps", () => {
     saveTimestamps("vid1", [{ time: 10 }]);
     saveTimestamps("vid1", [{ time: 20 }]);
     expect(loadTimestamps("vid1")).toEqual([{ time: 20 }]);
+  });
+});
+
+describe("saveVideoTitle / loadVideoTitle / deleteVideoTitle", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("roundtrip", () => {
+    saveVideoTitle("vid1", "Meu Vídeo");
+    expect(loadVideoTitle("vid1")).toBe("Meu Vídeo");
+  });
+
+  it("stores the title under yttsmeta_, apart from the timestamps", () => {
+    saveTimestamps("vid1", [{ time: 10 }]);
+    saveVideoTitle("vid1", "Meu Vídeo");
+    expect(localStorage.getItem("yttsmeta_vid1")).toBe(
+      JSON.stringify({ title: "Meu Vídeo" }),
+    );
+    expect(loadTimestamps("vid1")).toEqual([{ time: 10 }]);
+  });
+
+  it("returns '' for a video with no title saved", () => {
+    expect(loadVideoTitle("nonexistent")).toBe("");
+  });
+
+  it("an empty title does not overwrite a saved one", () => {
+    saveVideoTitle("vid1", "Meu Vídeo");
+    saveVideoTitle("vid1", "");
+    expect(loadVideoTitle("vid1")).toBe("Meu Vídeo");
+  });
+
+  it("returns '' when the meta value has no title string", () => {
+    localStorage.setItem("yttsmeta_vid1", JSON.stringify({ other: 1 }));
+    expect(loadVideoTitle("vid1")).toBe("");
+  });
+
+  it("deleteVideoTitle removes the meta key", () => {
+    saveVideoTitle("vid1", "Meu Vídeo");
+    deleteVideoTitle("vid1");
+    expect(localStorage.getItem("yttsmeta_vid1")).toBeNull();
+    expect(loadVideoTitle("vid1")).toBe("");
   });
 });
 
@@ -53,6 +96,23 @@ describe("getAllSavedVideos", () => {
     expect(getAllSavedVideos()).toHaveLength(1);
   });
 
+  it("returns the saved title, and '' for a video without one", () => {
+    saveTimestamps("vid1", [{ time: 10 }]);
+    saveVideoTitle("vid1", "Meu Vídeo");
+    saveTimestamps("vid2", [{ time: 20 }]);
+
+    const byId = Object.fromEntries(
+      getAllSavedVideos().map((v) => [v.videoId, v.title]),
+    );
+    expect(byId).toEqual({ vid1: "Meu Vídeo", vid2: "" });
+  });
+
+  it("does not turn a yttsmeta_ key into an entry of its own", () => {
+    saveTimestamps("vid1", [{ time: 10 }]);
+    saveVideoTitle("vid1", "Meu Vídeo");
+    expect(getAllSavedVideos().map((v) => v.videoId)).toEqual(["vid1"]);
+  });
+
   it("ignores the ytts_ config keys, which are not arrays", () => {
     saveTimestamps("vid1", [{ time: 10 }]);
     localStorage.setItem("ytts_auto_cleanup", "true");
@@ -73,6 +133,14 @@ describe("deleteVideoTimestamps", () => {
 
   it("no-ops for non-existent video", () => {
     expect(() => deleteVideoTimestamps("ghost")).not.toThrow();
+  });
+
+  it("removes the title along with the timestamps", () => {
+    saveTimestamps("vid1", [{ time: 10 }]);
+    saveVideoTitle("vid1", "Meu Vídeo");
+    deleteVideoTimestamps("vid1");
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
+    expect(localStorage.getItem("yttsmeta_vid1")).toBeNull();
   });
 });
 
@@ -144,6 +212,38 @@ describe("removeExpiredFromStorage", () => {
     expect(localStorage.getItem("ytts_pane_position")).toBe(
       JSON.stringify({ top: 1, left: 2 }),
     );
+  });
+
+  it("removes the title when the video loses every timestamp", () => {
+    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveVideoTitle("vid1", "Meu Vídeo");
+    removeExpiredFromStorage();
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
+    expect(localStorage.getItem("yttsmeta_vid1")).toBeNull();
+  });
+
+  it("keeps the title when the video still has valid timestamps", () => {
+    saveTimestamps("vid1", [
+      { time: 10, expiration: past },
+      { time: 20, expiration: future },
+    ]);
+    saveVideoTitle("vid1", "Meu Vídeo");
+    removeExpiredFromStorage();
+    expect(loadVideoTitle("vid1")).toBe("Meu Vídeo");
+  });
+
+  it("sweeps every video with yttsmeta_ keys interleaved", () => {
+    saveVideoTitle("vid1", "Um");
+    saveTimestamps("vid2", [{ time: 20, expiration: past }]);
+    saveVideoTitle("vid2", "Dois");
+    saveTimestamps("vid3", [{ time: 30, expiration: past }]);
+    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+
+    const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
+
+    expect(cleanedCount).toBe(3);
+    expect(affectedVideoIds.sort()).toEqual(["vid1", "vid2", "vid3"]);
+    expect(localStorage.length).toBe(0);
   });
 
   it("leaves non-ytts_ keys alone", () => {

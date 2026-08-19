@@ -262,6 +262,10 @@ describe("init", () => {
     expect(pane.querySelector("ul .now-playing")).not.toBeNull();
   });
 
+  it("stamps the pane with the video it was mounted for", () => {
+    expect(ui.init().dataset.videoId).toBe("vid1");
+  });
+
   it("mounts the selection controls hidden", () => {
     const pane = ui.init();
     const selectAll = pane.querySelector(".ytls-header #ytts-select-all");
@@ -505,5 +509,156 @@ describe("settings", () => {
 
     document.querySelector("#ytts-save-settings").click();
     expect(clean).not.toHaveBeenCalled();
+  });
+});
+
+describe("settings modal tabs", () => {
+  const tabButtons = () => document.querySelectorAll(".ytts-tab");
+
+  it("opens on Settings, with the video tab hidden", () => {
+    ui.openSettingsModal();
+    const [settingsTab, videosTab] = tabButtons();
+
+    expect(settingsTab.classList.contains("ytts-tab-active")).toBe(true);
+    expect(videosTab.classList.contains("ytts-tab-active")).toBe(false);
+    expect(document.querySelector("#ytts-tab-videos").style.display).toBe("none");
+    expect(
+      document.querySelector("#ytts-tab-settings #auto-cleanup-expired"),
+    ).not.toBeNull();
+    expect(
+      document.querySelector("#ytts-tab-settings #start-minimized"),
+    ).not.toBeNull();
+    expect(
+      document.querySelector("#ytts-tab-settings #ytts-reset-position"),
+    ).not.toBeNull();
+  });
+
+  it("swaps the panes back and forth", () => {
+    ui.openSettingsModal();
+    const [settingsTab, videosTab] = tabButtons();
+    const settingsPane = document.querySelector("#ytts-tab-settings");
+    const videosPane = document.querySelector("#ytts-tab-videos");
+
+    videosTab.click();
+    expect(settingsPane.style.display).toBe("none");
+    expect(videosPane.style.display).toBe("");
+    expect(videosTab.classList.contains("ytts-tab-active")).toBe(true);
+    expect(settingsTab.classList.contains("ytts-tab-active")).toBe(false);
+
+    settingsTab.click();
+    expect(settingsPane.style.display).toBe("");
+    expect(videosPane.style.display).toBe("none");
+    expect(settingsTab.classList.contains("ytts-tab-active")).toBe(true);
+  });
+
+  it("hides Save on the Videos tab and brings it back on Settings", () => {
+    ui.openSettingsModal();
+    const [settingsTab, videosTab] = tabButtons();
+    const save = document.querySelector("#ytts-save-settings");
+
+    videosTab.click();
+    expect(save.style.display).toBe("none");
+
+    settingsTab.click();
+    expect(save.style.display).toBe("");
+  });
+
+  it("renders the list only once the Videos tab is opened", () => {
+    saveTimestamps("vid1", [
+      { time: 10, note: "", creation: "2024-01-01T00:00:00.000Z", expiration: null },
+    ]);
+    const render = vi.spyOn(ui, "renderVideoList");
+
+    ui.openSettingsModal();
+    expect(render).not.toHaveBeenCalled();
+
+    tabButtons()[1].click();
+    expect(render).toHaveBeenCalledWith(document.querySelector("#ytts-tab-videos"));
+  });
+});
+
+describe("renderVideoList", () => {
+  const stamp = (creation) => ({
+    time: 10,
+    note: "",
+    creation,
+    expiration: null,
+  });
+  const items = (container) => [...container.querySelectorAll(".ytts-video-item")];
+
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  it("shows the empty state when nothing is saved", () => {
+    ui.renderVideoList(container);
+    expect(container.querySelector(".ytts-video-empty").textContent).toBe(
+      "No videos with timestamps yet.",
+    );
+    expect(container.querySelector(".ytts-video-list")).toBeNull();
+  });
+
+  it("sorts by the newest creation, legacy entries last", () => {
+    saveTimestamps("old", [stamp("2024-01-01T00:00:00.000Z")]);
+    saveTimestamps("new", [
+      stamp("2020-01-01T00:00:00.000Z"),
+      stamp("2026-05-05T00:00:00.000Z"),
+    ]);
+    saveTimestamps("legacy", [stamp(undefined)]);
+
+    ui.renderVideoList(container);
+    expect(items(container).map((li) => li.dataset.videoId)).toEqual([
+      "new",
+      "old",
+      "legacy",
+    ]);
+  });
+
+  it("builds the row out of thumbnail, title, count and delete button", () => {
+    saveTimestamps("vid1", [
+      stamp("2024-01-01T00:00:00.000Z"),
+      stamp("2024-01-02T00:00:00.000Z"),
+    ]);
+    localStorage.setItem("yttsmeta_vid1", JSON.stringify({ title: "Meu Vídeo" }));
+
+    ui.renderVideoList(container);
+    const [li] = items(container);
+
+    expect(li.querySelector("img").src).toBe(
+      "https://i.ytimg.com/vi/vid1/mqdefault.jpg",
+    );
+    expect(li.querySelector("img").loading).toBe("lazy");
+    expect(li.querySelector("a").textContent).toBe("Meu Vídeo");
+    expect(li.querySelector("a").href).toBe("https://youtu.be/vid1");
+    expect(li.querySelector("a").target).toBe("_blank");
+    expect(li.querySelector("a").rel).toBe("noopener noreferrer");
+    expect(li.querySelector(".ytts-video-count").textContent).toBe("2");
+    expect(li.querySelector(".ytts-icon-btn").textContent).toBe("⛔");
+  });
+
+  it("falls back to the videoId when no title was saved", () => {
+    saveTimestamps("vid1", [stamp("2024-01-01T00:00:00.000Z")]);
+    ui.renderVideoList(container);
+    expect(container.querySelector("a").textContent).toBe("vid1");
+  });
+
+  it("hides a thumbnail that fails to load", () => {
+    saveTimestamps("gone", [stamp("2024-01-01T00:00:00.000Z")]);
+    ui.renderVideoList(container);
+
+    const img = container.querySelector("img");
+    img.dispatchEvent(new Event("error"));
+    expect(img.style.display).toBe("none");
+    expect(container.querySelector("a").textContent).toBe("gone");
+  });
+
+  it("replaces the previous render instead of stacking lists", () => {
+    saveTimestamps("vid1", [stamp("2024-01-01T00:00:00.000Z")]);
+    ui.renderVideoList(container);
+    ui.renderVideoList(container);
+    expect(container.querySelectorAll(".ytts-video-list").length).toBe(1);
   });
 });
