@@ -1149,9 +1149,18 @@
     border-radius: 3px;
     flex: 0 0 auto;
   }
-  .ytts-video-title {
+  .ytts-video-info {
     flex: 1;
     min-width: 0;
+  }
+  .ytts-video-date {
+    display: block;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 10px;
+    line-height: 1.2;
+  }
+  .ytts-video-title {
+    display: block;
     color: white;
     font-size: 13px;
     text-decoration: none;
@@ -1544,6 +1553,11 @@
             const time = Date.parse(creation);
             return Number.isNaN(time) ? newest : Math.max(newest, time);
           }, 0);
+          const firstCreation = (timestamps) => timestamps.reduce((oldest, { creation }) => {
+            const time = Date.parse(creation);
+            if (Number.isNaN(time)) return oldest;
+            return oldest === null ? time : Math.min(oldest, time);
+          }, null);
           videos.sort((a, b) => lastCreation(b) - lastCreation(a));
           const list = document.createElement("ul");
           list.className = "ytts-video-list";
@@ -1559,6 +1573,16 @@
             thumb.addEventListener("error", () => {
               thumb.style.display = "none";
             });
+            const info = document.createElement("div");
+            info.className = "ytts-video-info";
+            const created = firstCreation(timestamps);
+            if (created !== null) {
+              const date = document.createElement("span");
+              date.className = "ytts-video-date";
+              date.textContent = new Date(created).toLocaleDateString();
+              date.title = `First timestamp: ${date.textContent}`;
+              info.appendChild(date);
+            }
             const link = document.createElement("a");
             link.className = "ytts-video-title";
             link.href = `https://youtu.be/${videoId}`;
@@ -1566,6 +1590,7 @@
             link.rel = "noopener noreferrer";
             link.textContent = title || videoId;
             link.title = title || videoId;
+            info.appendChild(link);
             const count = document.createElement("span");
             count.className = "ytts-video-count";
             count.textContent = `${timestamps.length}`;
@@ -1577,7 +1602,7 @@
               handlers.deleteVideoFromList(videoId, li);
             });
             li.appendChild(thumb);
-            li.appendChild(link);
+            li.appendChild(info);
             li.appendChild(count);
             li.appendChild(deleteBtn);
             list.appendChild(li);

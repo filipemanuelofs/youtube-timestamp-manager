@@ -639,6 +639,36 @@ describe("renderVideoList", () => {
     expect(li.querySelector(".ytts-icon-btn").textContent).toBe("⛔");
   });
 
+  it("shows the oldest creation as the date, above the title", () => {
+    saveTimestamps("vid1", [
+      stamp("2026-05-05T00:00:00.000Z"),
+      stamp("2020-01-01T00:00:00.000Z"),
+      stamp("2024-01-01T00:00:00.000Z"),
+    ]);
+
+    ui.renderVideoList(container);
+    const info = container.querySelector(".ytts-video-item > .ytts-video-info");
+
+    expect([...info.children].map((child) => child.className)).toEqual([
+      "ytts-video-date",
+      "ytts-video-title",
+    ]);
+    // Comparar com a mesma API, e não com string fixa: `toLocaleDateString`
+    // segue o locale do ambiente e um literal quebraria fora do runner local.
+    expect(info.querySelector(".ytts-video-date").textContent).toBe(
+      new Date(Date.parse("2020-01-01T00:00:00.000Z")).toLocaleDateString(),
+    );
+  });
+
+  it("skips the date when no timestamp has a valid creation", () => {
+    saveTimestamps("legacy", [stamp(undefined), stamp("not a date")]);
+
+    ui.renderVideoList(container);
+
+    expect(container.querySelector(".ytts-video-info")).not.toBeNull();
+    expect(container.querySelector(".ytts-video-date")).toBeNull();
+  });
+
   it("falls back to the videoId when no title was saved", () => {
     saveTimestamps("vid1", [stamp("2024-01-01T00:00:00.000Z")]);
     ui.renderVideoList(container);
