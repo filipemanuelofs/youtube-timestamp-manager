@@ -102,8 +102,111 @@ describe("addStamp", () => {
     expect(loadTimestamps("vid1")[0].time).toBe(95);
   });
 
+  it("announces the new stamp", () => {
+    stubVideo({ currentTime: 65 });
+    handlers.addStamp();
+    expect(notifySpy).toHaveBeenCalledWith("⏱️ Timestamp added!");
+  });
+
   it("no-ops without a video", () => {
     handlers.addStamp();
+    expect(readListItems()).toEqual([]);
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("onHotkey", () => {
+  const press = (key, mods = {}, target = document.body) => {
+    const event = new KeyboardEvent("keydown", {
+      key,
+      ctrlKey: !!mods.ctrl,
+      altKey: !!mods.alt,
+      shiftKey: !!mods.shift,
+      metaKey: !!mods.meta,
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(event, "target", { value: target });
+    handlers.onHotkey(event);
+    return event;
+  };
+
+  beforeEach(() => stubVideo({ currentTime: 65 }));
+
+  it("adds a stamp on the factory shortcut", () => {
+    press("S", { shift: true });
+    expect(readListItems()).toEqual([{ time: "60", note: "" }]);
+  });
+
+  it("swallows the key it acted on", () => {
+    const event = press("S", { shift: true });
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("obeys the shortcut stored in settings", () => {
+    localStorage.setItem(
+      "ytts_hotkey",
+      JSON.stringify({ key: "K", ctrl: false, alt: true, shift: false, meta: false }),
+    );
+
+    press("S", { shift: true });
+    expect(readListItems()).toEqual([]);
+
+    press("K", { alt: true });
+    expect(readListItems()).toEqual([{ time: "60", note: "" }]);
+  });
+
+  it("stays quiet when the shortcut is switched off", () => {
+    localStorage.setItem("ytts_hotkey", "null");
+    const event = press("S", { shift: true });
+
+    expect(readListItems()).toEqual([]);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("stays quiet on any other key", () => {
+    press("S");
+    press("D", { shift: true });
+    expect(readListItems()).toEqual([]);
+  });
+
+  it("stays quiet without a pane on screen", () => {
+    document.querySelector("#ytls-pane").remove();
+    press("S", { shift: true });
+    expect(readListItems()).toEqual([]);
+  });
+
+  it("stays quiet while the settings modal is open", () => {
+    const modal = document.createElement("div");
+    modal.id = "ytts-settings-modal";
+    document.body.appendChild(modal);
+
+    press("S", { shift: true });
+    expect(readListItems()).toEqual([]);
+  });
+
+  it("stays quiet while a form field has the focus", () => {
+    ["INPUT", "TEXTAREA", "SELECT"].forEach((tag) => {
+      press("S", { shift: true }, document.createElement(tag));
+    });
+    expect(readListItems()).toEqual([]);
+  });
+
+  it("stays quiet while an editable element has the focus", () => {
+    const editable = document.createElement("div");
+    editable.contentEditable = "true";
+    // jsdom does not derive isContentEditable from the attribute.
+    Object.defineProperty(editable, "isContentEditable", { value: true });
+
+    press("S", { shift: true }, editable);
+    expect(readListItems()).toEqual([]);
+  });
+
+  it("stays quiet while text is being composed", () => {
+    const event = new KeyboardEvent("keydown", { key: "S", shiftKey: true });
+    Object.defineProperty(event, "isComposing", { value: true });
+    handlers.onHotkey(event);
+
     expect(readListItems()).toEqual([]);
   });
 });

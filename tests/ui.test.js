@@ -6,6 +6,7 @@ import { progressMarkers } from "../src/progressMarkers.js";
 import { elements } from "../src/state.js";
 import * as notification from "../src/utils/notification.js";
 import { saveTimestamps } from "../src/utils/storage.js";
+import { DEFAULT_HOTKEY } from "../src/utils/hotkey.js";
 import {
   createPane,
   readListItems,
@@ -16,6 +17,21 @@ import {
 
 const rows = () =>
   document.querySelectorAll("#ytls-pane ul li:not(.now-playing)");
+
+const hotkeyField = () => document.querySelector("#ytts-hotkey-field");
+
+const press = (target, key, mods = {}) =>
+  target.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key,
+      ctrlKey: !!mods.ctrl,
+      altKey: !!mods.alt,
+      shiftKey: !!mods.shift,
+      metaKey: !!mods.meta,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
 
 beforeEach(() => {
   resetEnvironment();
@@ -423,6 +439,127 @@ describe("settings", () => {
     expect(ui.getStartMinimizedSetting()).toBe(true);
     localStorage.setItem("ytts_start_minimized", "false");
     expect(ui.getStartMinimizedSetting()).toBe(false);
+  });
+
+  it("falls back to the factory hotkey when nothing is stored", () => {
+    expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
+  });
+
+  it("reads the stored hotkey", () => {
+    const stored = { key: "D", ctrl: true, alt: false, shift: false, meta: false };
+    localStorage.setItem("ytts_hotkey", JSON.stringify(stored));
+    expect(ui.getHotkeySetting()).toEqual(stored);
+  });
+
+  it("reads a stored null as the hotkey being switched off", () => {
+    localStorage.setItem("ytts_hotkey", "null");
+    expect(ui.getHotkeySetting()).toBeNull();
+  });
+
+  it("falls back to the factory hotkey when the stored value is unusable", () => {
+    localStorage.setItem("ytts_hotkey", "{not json");
+    expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
+
+    localStorage.setItem("ytts_hotkey", JSON.stringify({ key: "" }));
+    expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
+  });
+
+  it("persists the hotkey held by the capture field on save", () => {
+    ui.openSettingsModal();
+    press(hotkeyField(), "K", { alt: true });
+
+    document.querySelector("#ytts-save-settings").click();
+    expect(ui.getHotkeySetting()).toEqual({
+      key: "K",
+      ctrl: false,
+      alt: true,
+      shift: false,
+      meta: false,
+    });
+  });
+
+  it("persists an emptied capture field as the hotkey being switched off", () => {
+    ui.openSettingsModal();
+    document.querySelector("#ytts-hotkey-clear").click();
+
+    document.querySelector("#ytts-save-settings").click();
+    expect(localStorage.getItem("ytts_hotkey")).toBe("null");
+    expect(ui.getHotkeySetting()).toBeNull();
+  });
+
+  it("opens the capture field showing the hotkey in force", () => {
+    ui.openSettingsModal();
+    expect(hotkeyField().value).toBe("Shift+S");
+
+    document.querySelector("#ytts-cancel-settings").click();
+    localStorage.setItem("ytts_hotkey", "null");
+    ui.openSettingsModal();
+    expect(hotkeyField().value).toBe("Disabled");
+  });
+
+  it("announces it is listening while the capture field has focus", () => {
+    ui.openSettingsModal();
+    const field = hotkeyField();
+    field.dispatchEvent(new FocusEvent("focus"));
+
+    expect(field.value).toBe("Press a combination...");
+    expect(field.classList.contains("capturing")).toBe(true);
+  });
+
+  it("puts the label back when focus leaves without a key being pressed", () => {
+    ui.openSettingsModal();
+    const field = hotkeyField();
+    field.dispatchEvent(new FocusEvent("focus"));
+    field.dispatchEvent(new FocusEvent("blur"));
+
+    expect(field.value).toBe("Shift+S");
+    expect(field.classList.contains("capturing")).toBe(false);
+  });
+
+  it("records the combination pressed in the capture field", () => {
+    ui.openSettingsModal();
+    const field = hotkeyField();
+    press(field, "d", { ctrl: true, shift: true });
+
+    expect(field.value).toBe("Ctrl+Shift+D");
+    expect(JSON.parse(field.dataset.hotkey)).toEqual({
+      key: "D",
+      ctrl: true,
+      alt: false,
+      shift: true,
+      meta: false,
+    });
+  });
+
+  it("keeps listening while only a modifier is held down", () => {
+    ui.openSettingsModal();
+    const field = hotkeyField();
+    field.dispatchEvent(new FocusEvent("focus"));
+    press(field, "Shift", { shift: true });
+
+    expect(field.value).toBe("Press a combination...");
+  });
+
+  it("swallows the key so the global shortcut does not fire while capturing", () => {
+    ui.openSettingsModal();
+    const event = new KeyboardEvent("keydown", {
+      key: "S",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    hotkeyField().dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("discards the captured hotkey when the modal is cancelled", () => {
+    ui.openSettingsModal();
+    press(hotkeyField(), "K", { alt: true });
+    document.querySelector("#ytts-cancel-settings").click();
+
+    expect(localStorage.getItem("ytts_hotkey")).toBeNull();
+    expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
   });
 
   it("opens the modal reflecting the stored settings", () => {

@@ -1,11 +1,21 @@
 /**
  * Exibe uma notificação toast animada no canto superior direito da tela.
  * A notificação desliza para dentro e some automaticamente após a duração definida.
+ *
+ * Em tela cheia o toast é montado dentro do elemento em tela cheia: filho do
+ * `body` não é renderizado enquanto outro elemento ocupa a tela.
+ *
+ * Toast anterior ainda visível é removido antes: todos ocupam a mesma posição
+ * fixa, então dois ao mesmo tempo — atalho apertado em sequência — ficariam
+ * sobrepostos e ilegíveis.
  * @param {string} message - Mensagem a ser exibida.
  * @param {number} [duration=2000] - Duração em milissegundos antes de desaparecer.
  */
 export function showNotification(message, duration = 2000) {
+  document.querySelector(".ytts-toast")?.remove();
+
   const notification = document.createElement("div");
+  notification.className = "ytts-toast";
   notification.textContent = message;
   notification.style.cssText = `
     position: fixed;
@@ -24,7 +34,8 @@ export function showNotification(message, duration = 2000) {
     transition: transform 0.3s ease;
   `;
 
-  document.body.appendChild(notification);
+  const host = document.fullscreenElement || document.body;
+  host.appendChild(notification);
 
   setTimeout(() => {
     notification.style.transform = "translateX(0)";

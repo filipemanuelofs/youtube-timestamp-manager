@@ -6,6 +6,11 @@ import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
 import { getAllSavedVideos } from "./utils/storage.js";
 import { getVideoId } from "./utils/video.js";
+import {
+  DEFAULT_HOTKEY,
+  formatHotkey,
+  hotkeyFromEvent,
+} from "./utils/hotkey.js";
 
 // Acima desta quantidade de timestamps a UI de seleção múltipla aparece.
 const SELECTION_MIN_COUNT = 3;
@@ -265,6 +270,43 @@ const STYLES = `
     height: 16px;
     accent-color: #4FC3F7;
     cursor: pointer;
+  }
+  .ytts-hotkey-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    color: white;
+    font-size: 14px;
+  }
+  #ytts-hotkey-field {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    text-align: center;
+    cursor: pointer;
+    caret-color: transparent;
+  }
+  #ytts-hotkey-field.capturing {
+    border-color: #4FC3F7;
+    color: #4FC3F7;
+  }
+  #ytts-hotkey-clear {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #ytts-hotkey-clear:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
   }
   .ytts-settings-footer {
     display: flex;
@@ -672,6 +714,9 @@ export const ui = {
     list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
 
     window.addEventListener("unload", handlers.warn);
+    // Fase de captura: o YouTube escuta as próprias teclas em `document`, e sem
+    // chegar antes dele um atalho sobre uma tecla dele seria consumido lá.
+    document.addEventListener("keydown", handlers.onHotkey, true);
 
     pane.appendChild(header);
     pane.appendChild(list);
@@ -789,6 +834,68 @@ export const ui = {
     labelMinimized.appendChild(checkboxMinimized);
     labelMinimized.appendChild(spanMinimized);
     settingsTab.appendChild(labelMinimized);
+
+    const hotkeyRow = document.createElement("div");
+    hotkeyRow.className = "ytts-hotkey-row";
+
+    const hotkeyLabel = document.createElement("span");
+    hotkeyLabel.textContent = "Timestamp shortcut";
+
+    // Somente leitura: o valor vem do `keydown` capturado, nunca do que for
+    // digitado. O `dataset` carrega a combinação até o Save — `""` é atalho
+    // desligado, e `saveSettings` a traduz para `null` no storage.
+    const hotkeyField = document.createElement("input");
+    hotkeyField.id = "ytts-hotkey-field";
+    hotkeyField.type = "text";
+    hotkeyField.readOnly = true;
+    hotkeyField.title = "Click and press the combination you want";
+
+    const setHotkeyField = (hotkey) => {
+      hotkeyField.dataset.hotkey = hotkey ? JSON.stringify(hotkey) : "";
+      hotkeyField.value = formatHotkey(hotkey) || "Disabled";
+    };
+
+    setHotkeyField(ui.getHotkeySetting());
+
+    hotkeyField.addEventListener("focus", () => {
+      hotkeyField.classList.add("capturing");
+      hotkeyField.value = "Press a combination...";
+    });
+
+    hotkeyField.addEventListener("blur", () => {
+      hotkeyField.classList.remove("capturing");
+      // Saiu sem apertar nada: o `dataset` ainda tem o valor de antes, que volta
+      // ao rótulo no lugar do texto de captura.
+      const stored = hotkeyField.dataset.hotkey;
+      hotkeyField.value = stored
+        ? formatHotkey(JSON.parse(stored))
+        : "Disabled";
+    });
+
+    hotkeyField.addEventListener("keydown", (e) => {
+      // O atalho global escuta na fase de captura em `document`: sem barrar aqui,
+      // configurar a tecla nova já criaria um timestamp no ato.
+      e.preventDefault();
+      e.stopPropagation();
+
+      const captured = hotkeyFromEvent(e);
+      if (!captured) return;
+
+      setHotkeyField(captured);
+      hotkeyField.blur();
+    });
+
+    const hotkeyClearBtn = document.createElement("button");
+    hotkeyClearBtn.id = "ytts-hotkey-clear";
+    hotkeyClearBtn.textContent = "Clear";
+    hotkeyClearBtn.title = "Turn the shortcut off";
+
+    hotkeyClearBtn.addEventListener("click", () => setHotkeyField(null));
+
+    hotkeyRow.appendChild(hotkeyLabel);
+    hotkeyRow.appendChild(hotkeyField);
+    hotkeyRow.appendChild(hotkeyClearBtn);
+    settingsTab.appendChild(hotkeyRow);
 
     // Ação, não preferência: age no clique e não passa pelo Save.
     const resetPositionBtn = document.createElement("button");
@@ -989,6 +1096,28 @@ export const ui = {
     }
   },
 
+  /**
+   * Lê o atalho de teclado configurado para criar timestamp.
+   * Chave ausente devolve o atalho de fábrica; `null` gravado significa atalho
+   * desligado pelo usuário; valor corrompido cai no padrão.
+   * @returns {{key: string, ctrl: boolean, alt: boolean, shift: boolean, meta: boolean}|null}
+   *   Atalho configurado, ou `null` se desligado.
+   */
+  getHotkeySetting() {
+    try {
+      const raw = localStorage.getItem("ytts_hotkey");
+      if (raw === null) return DEFAULT_HOTKEY;
+      const parsed = JSON.parse(raw);
+      if (parsed === null) return null;
+      if (parsed && typeof parsed.key === "string" && parsed.key) {
+        return parsed;
+      }
+      return DEFAULT_HOTKEY;
+    } catch {
+      return DEFAULT_HOTKEY;
+    }
+  },
+
   getStartMinimizedSetting() {
     try {
       const val = localStorage.getItem("ytts_start_minimized");
@@ -1005,10 +1134,19 @@ export const ui = {
   saveSettings() {
     const autoCleanup = document.querySelector("#auto-cleanup-expired").checked;
     const startMinimized = document.querySelector("#start-minimized").checked;
+    // O campo de atalho guarda a combinação capturada no próprio `dataset`, e
+    // só o Save a promove a preferência — fechar no Cancel descarta a captura.
+    const hotkeyField = document.querySelector("#ytts-hotkey-field");
 
     try {
       localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
       localStorage.setItem("ytts_start_minimized", startMinimized.toString());
+      if (hotkeyField) {
+        localStorage.setItem(
+          "ytts_hotkey",
+          hotkeyField.dataset.hotkey || "null",
+        );
+      }
 
       if (autoCleanup) {
         handlers.cleanExpired();

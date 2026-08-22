@@ -80,7 +80,9 @@ The selection controls only show up once the list has more than 3 timestamps —
 
 2. **Add timestamps:**
 
-   - Click "Add Timestamp" at the desired moment
+   - Click "Add Timestamp" at the desired moment, or press the keyboard
+     shortcut (**Shift+S** out of the box) — it works in fullscreen and with the
+     panel minimized, and a toast confirms every timestamp
    - Type a note in the text field
    - Repeat to add more timestamps
 
@@ -110,6 +112,12 @@ open the settings:
 | ------------------------------------------ | ------- | ------------------------------------------------------ |
 | **Automatically clean expired timestamps** | Off     | Drops timestamps older than 30 days when a video loads |
 | **Start widget minimized**                 | On      | Opens the panel collapsed, showing only the header     |
+| **Timestamp shortcut**                     | Shift+S | Keyboard shortcut that adds a timestamp                |
+
+To change the shortcut, click the field and press the combination you want; the
+**Clear** button next to it turns the shortcut off. The shortcut is ignored while
+you are typing — in a timestamp note, in the YouTube search box, or anywhere else
+text can be entered.
 
 The settings also carry a **Reset widget position** button, which drops the saved
 position and sends the panel back to the bottom-left corner. It acts on click —

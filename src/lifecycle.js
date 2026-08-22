@@ -54,6 +54,10 @@ export function cleanupTimestampManager() {
   progressMarkers.destroy();
 
   window.removeEventListener("unload", handlers.warn);
+  // O terceiro argumento tem de repetir o `true` do `ui.init()`: listener de
+  // captura e de bolha são registros distintos, e sem ele o atalho sobreviveria
+  // ao cleanup, criando timestamp com o painel já fora da tela.
+  document.removeEventListener("keydown", handlers.onHotkey, true);
   elements.video = null;
   state.videoId = null;
 }

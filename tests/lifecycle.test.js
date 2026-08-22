@@ -145,6 +145,33 @@ describe("cleanupTimestampManager", () => {
     expect(remove).toHaveBeenCalledWith("unload", handlers.warn);
   });
 
+  it("detaches the keyboard shortcut, which is registered on capture", () => {
+    atUrl("https://www.youtube.com/watch?v=abc");
+    vi.spyOn(progressMarkers, "init").mockImplementation(() => {});
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn(() => 1),
+    );
+    const add = vi.spyOn(handlers, "addStamp").mockImplementation(() => {});
+    const shortcut = () =>
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "S",
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+    ui.init();
+    shortcut();
+    expect(add).toHaveBeenCalledTimes(1);
+
+    cleanupTimestampManager();
+    shortcut();
+    expect(add).toHaveBeenCalledTimes(1);
+  });
+
   it("is safe to call when nothing was ever initialised", () => {
     expect(() => cleanupTimestampManager()).not.toThrow();
   });

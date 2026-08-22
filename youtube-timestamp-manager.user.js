@@ -615,7 +615,9 @@
 
   // src/utils/notification.js
   function showNotification(message, duration = 2e3) {
+    document.querySelector(".ytts-toast")?.remove();
     const notification = document.createElement("div");
+    notification.className = "ytts-toast";
     notification.textContent = message;
     notification.style.cssText = `
     position: fixed;
@@ -633,7 +635,8 @@
     transform: translateX(100%);
     transition: transform 0.3s ease;
   `;
-    document.body.appendChild(notification);
+    const host = document.fullscreenElement || document.body;
+    host.appendChild(notification);
     setTimeout(() => {
       notification.style.transform = "translateX(0)";
     }, 10);
@@ -644,6 +647,51 @@
   }
   var init_notification = __esm({
     "src/utils/notification.js"() {
+    }
+  });
+
+  // src/utils/hotkey.js
+  function normalizeKey(key) {
+    if (key === " ") return "Space";
+    return key.length === 1 ? key.toUpperCase() : key;
+  }
+  function hotkeyFromEvent(event) {
+    if (!event || !event.key || MODIFIER_KEYS.includes(event.key)) return null;
+    return {
+      key: normalizeKey(event.key),
+      ctrl: !!event.ctrlKey,
+      alt: !!event.altKey,
+      shift: !!event.shiftKey,
+      meta: !!event.metaKey
+    };
+  }
+  function formatHotkey(hotkey) {
+    if (!hotkey || !hotkey.key) return "";
+    const parts = [];
+    if (hotkey.ctrl) parts.push("Ctrl");
+    if (hotkey.alt) parts.push("Alt");
+    if (hotkey.shift) parts.push("Shift");
+    if (hotkey.meta) parts.push("Meta");
+    parts.push(normalizeKey(hotkey.key));
+    return parts.join("+");
+  }
+  function matchesHotkey(event, hotkey) {
+    if (!event || !hotkey || !hotkey.key) return false;
+    const pressed = hotkeyFromEvent(event);
+    if (!pressed) return false;
+    return pressed.key === normalizeKey(hotkey.key) && pressed.ctrl === !!hotkey.ctrl && pressed.alt === !!hotkey.alt && pressed.shift === !!hotkey.shift && pressed.meta === !!hotkey.meta;
+  }
+  var MODIFIER_KEYS, DEFAULT_HOTKEY;
+  var init_hotkey = __esm({
+    "src/utils/hotkey.js"() {
+      MODIFIER_KEYS = ["Shift", "Control", "Alt", "Meta", "AltGraph"];
+      DEFAULT_HOTKEY = {
+        key: "S",
+        ctrl: false,
+        alt: false,
+        shift: true,
+        meta: false
+      };
     }
   });
 
@@ -777,6 +825,7 @@
       init_handlers();
       init_storage();
       init_video();
+      init_hotkey();
       SELECTION_MIN_COUNT = 3;
       STYLES = `
   #ytls-pane {
@@ -1033,6 +1082,43 @@
     height: 16px;
     accent-color: #4FC3F7;
     cursor: pointer;
+  }
+  .ytts-hotkey-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    color: white;
+    font-size: 14px;
+  }
+  #ytts-hotkey-field {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    text-align: center;
+    cursor: pointer;
+    caret-color: transparent;
+  }
+  #ytts-hotkey-field.capturing {
+    border-color: #4FC3F7;
+    color: #4FC3F7;
+  }
+  #ytts-hotkey-clear {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #ytts-hotkey-clear:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
   }
   .ytts-settings-footer {
     display: flex;
@@ -1382,6 +1468,7 @@
           list.addEventListener("click", handlers.clickStamp);
           list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
           window.addEventListener("unload", handlers.warn);
+          document.addEventListener("keydown", handlers.onHotkey, true);
           pane.appendChild(header);
           pane.appendChild(list);
           pane.appendChild(box);
@@ -1465,6 +1552,46 @@
           labelMinimized.appendChild(checkboxMinimized);
           labelMinimized.appendChild(spanMinimized);
           settingsTab.appendChild(labelMinimized);
+          const hotkeyRow = document.createElement("div");
+          hotkeyRow.className = "ytts-hotkey-row";
+          const hotkeyLabel = document.createElement("span");
+          hotkeyLabel.textContent = "Timestamp shortcut";
+          const hotkeyField = document.createElement("input");
+          hotkeyField.id = "ytts-hotkey-field";
+          hotkeyField.type = "text";
+          hotkeyField.readOnly = true;
+          hotkeyField.title = "Click and press the combination you want";
+          const setHotkeyField = (hotkey) => {
+            hotkeyField.dataset.hotkey = hotkey ? JSON.stringify(hotkey) : "";
+            hotkeyField.value = formatHotkey(hotkey) || "Disabled";
+          };
+          setHotkeyField(ui.getHotkeySetting());
+          hotkeyField.addEventListener("focus", () => {
+            hotkeyField.classList.add("capturing");
+            hotkeyField.value = "Press a combination...";
+          });
+          hotkeyField.addEventListener("blur", () => {
+            hotkeyField.classList.remove("capturing");
+            const stored = hotkeyField.dataset.hotkey;
+            hotkeyField.value = stored ? formatHotkey(JSON.parse(stored)) : "Disabled";
+          });
+          hotkeyField.addEventListener("keydown", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const captured = hotkeyFromEvent(e);
+            if (!captured) return;
+            setHotkeyField(captured);
+            hotkeyField.blur();
+          });
+          const hotkeyClearBtn = document.createElement("button");
+          hotkeyClearBtn.id = "ytts-hotkey-clear";
+          hotkeyClearBtn.textContent = "Clear";
+          hotkeyClearBtn.title = "Turn the shortcut off";
+          hotkeyClearBtn.addEventListener("click", () => setHotkeyField(null));
+          hotkeyRow.appendChild(hotkeyLabel);
+          hotkeyRow.appendChild(hotkeyField);
+          hotkeyRow.appendChild(hotkeyClearBtn);
+          settingsTab.appendChild(hotkeyRow);
           const resetPositionBtn = document.createElement("button");
           resetPositionBtn.id = "ytts-reset-position";
           resetPositionBtn.textContent = "Reset widget position";
@@ -1620,6 +1747,27 @@
             return false;
           }
         },
+        /**
+         * Lê o atalho de teclado configurado para criar timestamp.
+         * Chave ausente devolve o atalho de fábrica; `null` gravado significa atalho
+         * desligado pelo usuário; valor corrompido cai no padrão.
+         * @returns {{key: string, ctrl: boolean, alt: boolean, shift: boolean, meta: boolean}|null}
+         *   Atalho configurado, ou `null` se desligado.
+         */
+        getHotkeySetting() {
+          try {
+            const raw = localStorage.getItem("ytts_hotkey");
+            if (raw === null) return DEFAULT_HOTKEY;
+            const parsed = JSON.parse(raw);
+            if (parsed === null) return null;
+            if (parsed && typeof parsed.key === "string" && parsed.key) {
+              return parsed;
+            }
+            return DEFAULT_HOTKEY;
+          } catch {
+            return DEFAULT_HOTKEY;
+          }
+        },
         getStartMinimizedSetting() {
           try {
             const val = localStorage.getItem("ytts_start_minimized");
@@ -1635,9 +1783,16 @@
         saveSettings() {
           const autoCleanup = document.querySelector("#auto-cleanup-expired").checked;
           const startMinimized = document.querySelector("#start-minimized").checked;
+          const hotkeyField = document.querySelector("#ytts-hotkey-field");
           try {
             localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
             localStorage.setItem("ytts_start_minimized", startMinimized.toString());
+            if (hotkeyField) {
+              localStorage.setItem(
+                "ytts_hotkey",
+                hotkeyField.dataset.hotkey || "null"
+              );
+            }
             if (autoCleanup) {
               handlers.cleanExpired();
             }
@@ -1660,6 +1815,7 @@
       init_video();
       init_clipboard();
       init_notification();
+      init_hotkey();
       init_storage();
       init_progressMarkers();
       init_ui();
@@ -1734,6 +1890,8 @@
         /**
          * Adiciona um novo timestamp com o tempo atual do vídeo (menos 5 segundos) à lista.
          * Salva automaticamente e atualiza os marcadores de progresso.
+         * Notifica a criação: pelo atalho de teclado, com o painel minimizado ou em
+         * tela cheia, o toast é o único sinal de que o timestamp existe.
          */
         addStamp() {
           const video = getVideo();
@@ -1743,6 +1901,29 @@
           textInput.focus();
           handlers.saveCurrentTimestamps();
           progressMarkers.updateMarkers();
+          showNotification("\u23F1\uFE0F Timestamp added!");
+        },
+        /**
+         * Handler global de `keydown`: cria um timestamp quando o atalho configurado
+         * é pressionado.
+         * Fica calado sem painel na tela, com o modal de Settings aberto (onde a
+         * própria captura do atalho acontece), durante composição de texto (IME) e
+         * quando o foco está em campo editável — inclusive a nota do timestamp e a
+         * busca do YouTube.
+         * @param {KeyboardEvent} e - Evento de teclado.
+         */
+        onHotkey(e) {
+          if (!document.querySelector("#ytls-pane")) return;
+          if (document.querySelector("#ytts-settings-modal")) return;
+          if (e.isComposing) return;
+          const target = e.target;
+          if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) {
+            return;
+          }
+          if (!matchesHotkey(e, ui.getHotkeySetting())) return;
+          e.preventDefault();
+          e.stopPropagation();
+          handlers.addStamp();
         },
         /**
          * Copia todos os timestamps da lista para a área de transferência no formato `link - nota`.
@@ -1918,6 +2099,7 @@
     document.querySelector("#ytts-settings-modal")?.remove();
     progressMarkers.destroy();
     window.removeEventListener("unload", handlers.warn);
+    document.removeEventListener("keydown", handlers.onHotkey, true);
     elements.video = null;
     state.videoId = null;
   }

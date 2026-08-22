@@ -80,7 +80,9 @@ Os controles de seleção só aparecem quando a lista passa de 3 timestamps — 
 
 2. **Adicione timestamps:**
 
-   - Clique em "Add Timestamp" no momento desejado
+   - Clique em "Add Timestamp" no momento desejado, ou use o atalho de teclado
+     (**Shift+S** de fábrica) — ele funciona em tela cheia e com o painel
+     minimizado, e uma notificação confirma cada timestamp
    - Digite uma anotação no campo de texto
    - Repita para adicionar mais timestamps
 
@@ -110,6 +112,12 @@ abrir as configurações:
 | ------------------------------------------ | -------- | --------------------------------------------------------------- |
 | **Automatically clean expired timestamps** | Desligado | Descarta timestamps com mais de 30 dias quando o vídeo carrega  |
 | **Start widget minimized**                 | Ligado   | Abre o painel recolhido, mostrando só o cabeçalho               |
+| **Timestamp shortcut**                     | Shift+S  | Atalho de teclado que adiciona um timestamp                     |
+
+Para trocar o atalho, clique no campo e aperte a combinação desejada; o botão
+**Clear** ao lado desliga o atalho. O atalho é ignorado enquanto você digita —
+na anotação de um timestamp, na busca do YouTube ou em qualquer outro campo de
+texto.
 
 As configurações também trazem o botão **Reset widget position**, que apaga a
 posição salva e devolve o painel ao canto inferior esquerdo. Ele age no clique,

@@ -38,12 +38,37 @@ describe("showNotification", () => {
     expect(document.body.children).toHaveLength(0);
   });
 
-  it("stacks multiple notifications independently", () => {
+  it("replaces the previous notification instead of stacking on top of it", () => {
+    showNotification("first", 500);
+    showNotification("second", 2000);
+
+    expect(document.body.children).toHaveLength(1);
+    expect(toast().textContent).toBe("second");
+  });
+
+  it("keeps the survivor alive when the replaced one times out", () => {
     showNotification("first", 500);
     showNotification("second", 2000);
     vi.advanceTimersByTime(800);
+
     expect(document.body.children).toHaveLength(1);
     expect(toast().textContent).toBe("second");
+  });
+
+  it("mounts inside the fullscreen element while the player is fullscreen", () => {
+    const player = document.createElement("div");
+    document.body.appendChild(player);
+    // jsdom implements no Fullscreen API, so the element is declared by hand.
+    Object.defineProperty(document, "fullscreenElement", {
+      value: player,
+      configurable: true,
+    });
+
+    showNotification("saved!");
+    expect(player.children).toHaveLength(1);
+    expect(player.firstChild.textContent).toBe("saved!");
+
+    delete document.fullscreenElement;
   });
 
   it("renders as text, never as HTML", () => {

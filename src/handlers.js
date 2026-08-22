@@ -3,6 +3,7 @@ import { formatTime } from "./utils/time.js";
 import { getVideoId, getVideo, getVideoTitle } from "./utils/video.js";
 import { copyToClipboard, showCopyFeedback } from "./utils/clipboard.js";
 import { showNotification } from "./utils/notification.js";
+import { matchesHotkey } from "./utils/hotkey.js";
 import {
   saveTimestamps,
   loadTimestamps,
@@ -92,6 +93,8 @@ export const handlers = {
   /**
    * Adiciona um novo timestamp com o tempo atual do vídeo (menos 5 segundos) à lista.
    * Salva automaticamente e atualiza os marcadores de progresso.
+   * Notifica a criação: pelo atalho de teclado, com o painel minimizado ou em
+   * tela cheia, o toast é o único sinal de que o timestamp existe.
    */
   addStamp() {
     const video = getVideo();
@@ -103,6 +106,39 @@ export const handlers = {
 
     handlers.saveCurrentTimestamps();
     progressMarkers.updateMarkers();
+    showNotification("⏱️ Timestamp added!");
+  },
+
+  /**
+   * Handler global de `keydown`: cria um timestamp quando o atalho configurado
+   * é pressionado.
+   * Fica calado sem painel na tela, com o modal de Settings aberto (onde a
+   * própria captura do atalho acontece), durante composição de texto (IME) e
+   * quando o foco está em campo editável — inclusive a nota do timestamp e a
+   * busca do YouTube.
+   * @param {KeyboardEvent} e - Evento de teclado.
+   */
+  onHotkey(e) {
+    if (!document.querySelector("#ytls-pane")) return;
+    if (document.querySelector("#ytts-settings-modal")) return;
+    if (e.isComposing) return;
+
+    const target = e.target;
+    if (
+      target &&
+      (target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+    ) {
+      return;
+    }
+
+    if (!matchesHotkey(e, ui.getHotkeySetting())) return;
+
+    // O YouTube escuta as próprias teclas em `document`: sem barrar a propagação
+    // aqui, um atalho configurado sobre uma tecla dele dispararia os dois.
+    e.preventDefault();
+    e.stopPropagation();
+    handlers.addStamp();
   },
 
   /**
