@@ -1,5 +1,6 @@
 import { elements } from "./state.js";
 import { debounce } from "./utils/debounce.js";
+import { el } from "./utils/el.js";
 import { drag } from "./drag.js";
 import { showNotification } from "./utils/notification.js";
 import { progressMarkers } from "./progressMarkers.js";
@@ -11,6 +12,10 @@ import {
   formatHotkey,
   hotkeyFromEvent,
 } from "./utils/hotkey.js";
+
+// Caminho do ícone do GitHub no rodapé do modal de Settings.
+const GITHUB_ICON_PATH =
+  "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z";
 
 // Acima desta quantidade de timestamps a UI de seleção múltipla aparece.
 const SELECTION_MIN_COUNT = 3;
@@ -469,63 +474,66 @@ export const ui = {
    */
   createTimestampItem(time, note = "", creation = null, expiration = null) {
     const now = new Date();
-    const li = document.createElement("li");
-    li.dataset.creation = creation || now.toISOString();
-    li.dataset.expiration = expiration || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const selectBox = document.createElement("input");
-    const a = document.createElement("a");
-    const textInput = document.createElement("input");
-    const copyBtn = document.createElement("span");
-    const deleteBtn = document.createElement("span");
 
+    const a = el("a");
     handlers.updateStamp(a, time);
 
-    selectBox.type = "checkbox";
-    selectBox.classList.add("ytts-select");
-    selectBox.title = "Select timestamp";
-    selectBox.style.display = "none";
-
-    selectBox.addEventListener("change", () => {
-      ui.updateSelectionUI();
+    const selectBox = el("input", {
+      type: "checkbox",
+      className: "ytts-select",
+      title: "Select timestamp",
+      style: { display: "none" },
+      on: { change: () => ui.updateSelectionUI() },
     });
 
-    textInput.type = "text";
-    textInput.classList.add("ytts-note");
-    textInput.value = note;
-    textInput.placeholder = "Add note...";
+    const textInput = el("input", {
+      type: "text",
+      className: "ytts-note",
+      value: note,
+      placeholder: "Add note...",
+      on: {
+        input: debounce(() => {
+          handlers.saveCurrentTimestamps();
+        }, 500),
+      },
+    });
 
-    textInput.addEventListener(
-      "input",
-      debounce(() => {
-        handlers.saveCurrentTimestamps();
-      }, 500),
+    const li = el(
+      "li",
+      {
+        dataset: {
+          creation: creation || now.toISOString(),
+          expiration:
+            expiration ||
+            new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      [
+        selectBox,
+        a,
+        textInput,
+        el("span", {
+          className: "ytts-icon-btn",
+          title: "Copy timestamp",
+          textContent: "📋",
+          on: { click: () => handlers.copyIndividualTimestamp(a, textInput) },
+        }),
+        el("span", {
+          className: "ytts-icon-btn",
+          title: "Delete timestamp",
+          textContent: "⛔",
+          on: {
+            click: () => {
+              if (confirm("Delete this timestamp?")) {
+                li.remove();
+                handlers.saveCurrentTimestamps();
+                ui.updateSelectionUI();
+              }
+            },
+          },
+        }),
+      ],
     );
-
-    copyBtn.classList.add("ytts-icon-btn");
-    copyBtn.title = "Copy timestamp";
-    copyBtn.textContent = "📋";
-
-    deleteBtn.classList.add("ytts-icon-btn");
-    deleteBtn.title = "Delete timestamp";
-    deleteBtn.textContent = "⛔";
-
-    copyBtn.addEventListener("click", () => {
-      handlers.copyIndividualTimestamp(a, textInput);
-    });
-
-    deleteBtn.addEventListener("click", () => {
-      if (confirm("Delete this timestamp?")) {
-        li.remove();
-        handlers.saveCurrentTimestamps();
-        ui.updateSelectionUI();
-      }
-    });
-
-    li.appendChild(selectBox);
-    li.appendChild(a);
-    li.appendChild(textInput);
-    li.appendChild(copyBtn);
-    li.appendChild(deleteBtn);
 
     const list = document.querySelector("#ytls-pane ul");
     const nowPlaying = list.querySelector(".now-playing");
@@ -591,53 +599,110 @@ export const ui = {
    * @returns {HTMLDivElement} Elemento do painel criado.
    */
   init() {
-    const pane = document.createElement("div");
-    pane.id = "ytls-pane";
-    // Carimba o vídeo dono do painel. A navegação SPA troca a URL antes de
-    // remontar o painel, então `saveCurrentTimestamps` compara os dois e se cala
-    // enquanto eles não batem.
-    pane.dataset.videoId = getVideoId();
-
-    const header = document.createElement("div");
-    header.className = "ytls-header";
-
     // Minimizado, o cabeçalho é só os três ícones encostados à direita e não
     // sobra faixa vazia para agarrar; a alça é a área de pega em qualquer
     // estado, e diz onde pegar sem depender do usuário notar o cursor.
-    const dragHandle = document.createElement("span");
-    dragHandle.id = "ytts-drag-handle";
-    dragHandle.textContent = "⠿";
-    dragHandle.title = "Drag to move";
-
-    const selectAllBox = document.createElement("input");
-    selectAllBox.type = "checkbox";
-    selectAllBox.id = "ytts-select-all";
-    selectAllBox.title = "Select all";
-    selectAllBox.style.display = "none";
-
-    selectAllBox.addEventListener("change", () => {
-      document.querySelectorAll("#ytls-pane .ytts-select").forEach((box) => {
-        box.checked = selectAllBox.checked;
-      });
-      ui.updateSelectionUI();
+    const dragHandle = el("span", {
+      id: "ytts-drag-handle",
+      textContent: "⠿",
+      title: "Drag to move",
     });
 
-    const settingsBtn = document.createElement("span");
-    settingsBtn.textContent = "⚙️";
-    settingsBtn.classList.add("ytts-icon-btn");
-    settingsBtn.title = "Settings";
+    const selectAllBox = el("input", {
+      type: "checkbox",
+      id: "ytts-select-all",
+      title: "Select all",
+      style: { display: "none" },
+      on: {
+        change: () => {
+          document
+            .querySelectorAll("#ytls-pane .ytts-select")
+            .forEach((box) => {
+              box.checked = selectAllBox.checked;
+            });
+          ui.updateSelectionUI();
+        },
+      },
+    });
 
-    const minimizeBtn = document.createElement("span");
-    minimizeBtn.textContent = "🔽";
-    minimizeBtn.classList.add("ytts-icon-btn");
-    minimizeBtn.title = "Minimize";
+    const minimizeBtn = el("span", {
+      className: "ytts-icon-btn",
+      textContent: "🔽",
+      title: "Minimize",
+      on: { click: () => setMinimized(!pane.classList.contains("minimized")) },
+    });
 
-    const exitBtn = document.createElement("span");
-    exitBtn.textContent = "❌";
-    exitBtn.classList.add("ytts-icon-btn");
-    exitBtn.title = "Close";
+    const header = el("div", { className: "ytls-header" }, [
+      dragHandle,
+      selectAllBox,
+      el("span", {
+        className: "ytts-icon-btn",
+        textContent: "⚙️",
+        title: "Settings",
+        on: { click: ui.openSettingsModal },
+      }),
+      minimizeBtn,
+      el("span", {
+        className: "ytts-icon-btn",
+        textContent: "❌",
+        title: "Close",
+        on: { click: handlers.closePane },
+      }),
+    ]);
 
-    settingsBtn.addEventListener("click", ui.openSettingsModal);
+    const list = el(
+      "ul",
+      {
+        on: {
+          click: handlers.clickStamp,
+          touchstart: [handlers.clickStamp, { passive: true }],
+        },
+      },
+      [
+        el("li", { className: "now-playing" }, [
+          el("a"),
+          el("input", { disabled: true, value: "End of Video" }),
+        ]),
+      ],
+    );
+
+    const buttons = el("div", { className: "ytls-buttons" }, [
+      el("button", {
+        textContent: "Add Timestamp",
+        dataset: { action: "add" },
+        on: { click: handlers.addStamp },
+      }),
+      el("button", {
+        textContent: "Copy Timestamps",
+        dataset: { action: "copy" },
+        on: { click: handlers.copyList },
+      }),
+      el("button", {
+        id: "ytls-delete-selected",
+        textContent: "Delete Selected (0)",
+        dataset: { action: "delete-selected" },
+        style: { display: "none" },
+        on: { click: handlers.deleteSelectedTimestamps },
+      }),
+    ]);
+
+    const pane = el(
+      "div",
+      {
+        id: "ytls-pane",
+        // Carimba o vídeo dono do painel. A navegação SPA troca a URL antes de
+        // remontar o painel, então `saveCurrentTimestamps` compara os dois e se
+        // cala enquanto eles não batem.
+        dataset: { videoId: getVideoId() },
+      },
+      [
+        header,
+        list,
+        el("textarea", { id: "ytls-box", style: { display: "none" } }),
+        buttons,
+        el("style", { textContent: STYLES }),
+      ],
+    );
 
     const setMinimized = (minimized) => {
       if (minimized) {
@@ -655,74 +720,10 @@ export const ui = {
       drag.refresh();
     };
 
-    minimizeBtn.addEventListener("click", () => {
-      setMinimized(!pane.classList.contains("minimized"));
-    });
-
-    exitBtn.addEventListener("click", handlers.closePane);
-
-    header.appendChild(dragHandle);
-    header.appendChild(selectAllBox);
-    header.appendChild(settingsBtn);
-    header.appendChild(minimizeBtn);
-    header.appendChild(exitBtn);
-
-    const list = document.createElement("ul");
-
-    const nowLi = document.createElement("li");
-    nowLi.className = "now-playing";
-    const nowLink = document.createElement("a");
-    const nowText = document.createElement("input");
-    nowText.disabled = true;
-    nowText.value = "End of Video";
-    nowLi.appendChild(nowLink);
-    nowLi.appendChild(nowText);
-    list.appendChild(nowLi);
-
-    const box = document.createElement("textarea");
-    box.id = "ytls-box";
-    box.style.display = "none";
-
-    const buttons = document.createElement("div");
-    buttons.className = "ytls-buttons";
-
-    const addBtn = document.createElement("button");
-    addBtn.textContent = "Add Timestamp";
-    addBtn.dataset.action = "add";
-    addBtn.addEventListener("click", handlers.addStamp);
-
-    const copyBtn = document.createElement("button");
-    copyBtn.textContent = "Copy Timestamps";
-    copyBtn.dataset.action = "copy";
-    copyBtn.addEventListener("click", handlers.copyList);
-
-    const deleteSelectedBtn = document.createElement("button");
-    deleteSelectedBtn.id = "ytls-delete-selected";
-    deleteSelectedBtn.textContent = "Delete Selected (0)";
-    deleteSelectedBtn.dataset.action = "delete-selected";
-    deleteSelectedBtn.style.display = "none";
-    deleteSelectedBtn.addEventListener("click", handlers.deleteSelectedTimestamps);
-
-    buttons.appendChild(addBtn);
-    buttons.appendChild(copyBtn);
-    buttons.appendChild(deleteSelectedBtn);
-
-    const style = document.createElement("style");
-    style.textContent = STYLES;
-
-    list.addEventListener("click", handlers.clickStamp);
-    list.addEventListener("touchstart", handlers.clickStamp, { passive: true });
-
     window.addEventListener("unload", handlers.warn);
     // Fase de captura: o YouTube escuta as próprias teclas em `document`, e sem
     // chegar antes dele um atalho sobre uma tecla dele seria consumido lá.
     document.addEventListener("keydown", handlers.onHotkey, true);
-
-    pane.appendChild(header);
-    pane.appendChild(list);
-    pane.appendChild(box);
-    pane.appendChild(buttons);
-    pane.appendChild(style);
 
     document.body.appendChild(pane);
     elements.pane = pane;
@@ -751,104 +752,79 @@ export const ui = {
   openSettingsModal() {
     if (document.querySelector("#ytts-settings-modal")) return;
 
-    const modal = document.createElement("div");
-    modal.id = "ytts-settings-modal";
+    const closeBtn = el("span", {
+      className: "ytts-settings-close",
+      textContent: "×",
+    });
 
-    const content = document.createElement("div");
-    content.className = "ytts-settings-content";
+    const header = el("div", { className: "ytts-settings-header" }, [
+      el("h3", { textContent: "Settings" }),
+      closeBtn,
+    ]);
 
-    const header = document.createElement("div");
-    header.className = "ytts-settings-header";
+    const settingsTabBtn = el("button", {
+      className: "ytts-tab ytts-tab-active",
+      textContent: "Settings",
+    });
 
-    const title = document.createElement("h3");
-    title.textContent = "Settings";
+    const videosTabBtn = el("button", {
+      className: "ytts-tab",
+      textContent: "Videos",
+    });
 
-    const closeBtn = document.createElement("span");
-    closeBtn.className = "ytts-settings-close";
-    closeBtn.textContent = "×";
+    const tabs = el("div", { className: "ytts-tabs" }, [
+      settingsTabBtn,
+      videosTabBtn,
+    ]);
 
-    header.appendChild(title);
-    header.appendChild(closeBtn);
+    const settingsTab = el("div", { id: "ytts-tab-settings" });
 
-    const tabs = document.createElement("div");
-    tabs.className = "ytts-tabs";
+    const videosTab = el("div", {
+      id: "ytts-tab-videos",
+      style: { display: "none" },
+    });
 
-    const settingsTabBtn = document.createElement("button");
-    settingsTabBtn.className = "ytts-tab ytts-tab-active";
-    settingsTabBtn.textContent = "Settings";
-
-    const videosTabBtn = document.createElement("button");
-    videosTabBtn.className = "ytts-tab";
-    videosTabBtn.textContent = "Videos";
-
-    tabs.appendChild(settingsTabBtn);
-    tabs.appendChild(videosTabBtn);
-
-    const body = document.createElement("div");
-    body.className = "ytts-settings-body";
-
-    const settingsTab = document.createElement("div");
-    settingsTab.id = "ytts-tab-settings";
-
-    const videosTab = document.createElement("div");
-    videosTab.id = "ytts-tab-videos";
-    videosTab.style.display = "none";
-
-    body.appendChild(settingsTab);
-    body.appendChild(videosTab);
-
-    const label = document.createElement("label");
-    label.className = "ytts-setting-item";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.id = "auto-cleanup-expired";
-    checkbox.checked = ui.getAutoCleanupSetting();
-
-    const span = document.createElement("span");
-    span.append("Automatically clean expired timestamps");
-    span.appendChild(document.createElement("br"));
-
-    const small = document.createElement("small");
-    small.textContent =
-      "The expiration date is 1 month after the date the timestamp was added.";
-
-    span.appendChild(small);
-
-    label.appendChild(checkbox);
-    label.appendChild(span);
-    settingsTab.appendChild(label);
-
-    const labelMinimized = document.createElement("label");
-    labelMinimized.className = "ytts-setting-item";
-    labelMinimized.style.marginTop = "12px";
-
-    const checkboxMinimized = document.createElement("input");
-    checkboxMinimized.type = "checkbox";
-    checkboxMinimized.id = "start-minimized";
-    checkboxMinimized.checked = ui.getStartMinimizedSetting();
-
-    const spanMinimized = document.createElement("span");
-    spanMinimized.textContent = "Start widget minimized";
-
-    labelMinimized.appendChild(checkboxMinimized);
-    labelMinimized.appendChild(spanMinimized);
-    settingsTab.appendChild(labelMinimized);
-
-    const hotkeyRow = document.createElement("div");
-    hotkeyRow.className = "ytts-hotkey-row";
-
-    const hotkeyLabel = document.createElement("span");
-    hotkeyLabel.textContent = "Timestamp shortcut";
+    const body = el("div", { className: "ytts-settings-body" }, [
+      settingsTab,
+      videosTab,
+    ]);
 
     // Somente leitura: o valor vem do `keydown` capturado, nunca do que for
     // digitado. O `dataset` carrega a combinação até o Save — `""` é atalho
     // desligado, e `saveSettings` a traduz para `null` no storage.
-    const hotkeyField = document.createElement("input");
-    hotkeyField.id = "ytts-hotkey-field";
-    hotkeyField.type = "text";
-    hotkeyField.readOnly = true;
-    hotkeyField.title = "Click and press the combination you want";
+    const hotkeyField = el("input", {
+      id: "ytts-hotkey-field",
+      type: "text",
+      readOnly: true,
+      title: "Click and press the combination you want",
+      on: {
+        focus: () => {
+          hotkeyField.classList.add("capturing");
+          hotkeyField.value = "Press a combination...";
+        },
+        blur: () => {
+          hotkeyField.classList.remove("capturing");
+          // Saiu sem apertar nada: o `dataset` ainda tem o valor de antes, que
+          // volta ao rótulo no lugar do texto de captura.
+          const stored = hotkeyField.dataset.hotkey;
+          hotkeyField.value = stored
+            ? formatHotkey(JSON.parse(stored))
+            : "Disabled";
+        },
+        keydown: (e) => {
+          // O atalho global escuta na fase de captura em `document`: sem barrar
+          // aqui, configurar a tecla nova já criaria um timestamp no ato.
+          e.preventDefault();
+          e.stopPropagation();
+
+          const captured = hotkeyFromEvent(e);
+          if (!captured) return;
+
+          setHotkeyField(captured);
+          hotkeyField.blur();
+        },
+      },
+    });
 
     const setHotkeyField = (hotkey) => {
       hotkeyField.dataset.hotkey = hotkey ? JSON.stringify(hotkey) : "";
@@ -857,109 +833,103 @@ export const ui = {
 
     setHotkeyField(ui.getHotkeySetting());
 
-    hotkeyField.addEventListener("focus", () => {
-      hotkeyField.classList.add("capturing");
-      hotkeyField.value = "Press a combination...";
-    });
-
-    hotkeyField.addEventListener("blur", () => {
-      hotkeyField.classList.remove("capturing");
-      // Saiu sem apertar nada: o `dataset` ainda tem o valor de antes, que volta
-      // ao rótulo no lugar do texto de captura.
-      const stored = hotkeyField.dataset.hotkey;
-      hotkeyField.value = stored
-        ? formatHotkey(JSON.parse(stored))
-        : "Disabled";
-    });
-
-    hotkeyField.addEventListener("keydown", (e) => {
-      // O atalho global escuta na fase de captura em `document`: sem barrar aqui,
-      // configurar a tecla nova já criaria um timestamp no ato.
-      e.preventDefault();
-      e.stopPropagation();
-
-      const captured = hotkeyFromEvent(e);
-      if (!captured) return;
-
-      setHotkeyField(captured);
-      hotkeyField.blur();
-    });
-
-    const hotkeyClearBtn = document.createElement("button");
-    hotkeyClearBtn.id = "ytts-hotkey-clear";
-    hotkeyClearBtn.textContent = "Clear";
-    hotkeyClearBtn.title = "Turn the shortcut off";
-
-    hotkeyClearBtn.addEventListener("click", () => setHotkeyField(null));
-
-    hotkeyRow.appendChild(hotkeyLabel);
-    hotkeyRow.appendChild(hotkeyField);
-    hotkeyRow.appendChild(hotkeyClearBtn);
-    settingsTab.appendChild(hotkeyRow);
-
-    // Ação, não preferência: age no clique e não passa pelo Save.
-    const resetPositionBtn = document.createElement("button");
-    resetPositionBtn.id = "ytts-reset-position";
-    resetPositionBtn.textContent = "Reset widget position";
-
-    resetPositionBtn.addEventListener("click", () => {
-      drag.resetPosition();
-      showNotification("↩️ Widget position reset");
-    });
-
-    settingsTab.appendChild(resetPositionBtn);
-
-    const footer = document.createElement("div");
-    footer.className = "ytts-settings-footer";
-
-    const versionEl = document.createElement("div");
-    versionEl.className = "ytts-settings-version";
-
-    const versionText = document.createElement("span");
-    versionText.textContent = `v${__VERSION__}`;
-
-    const separator = document.createElement("span");
-    separator.className = "ytts-settings-version-separator";
-    separator.textContent = "|";
-
-    const githubLink = document.createElement("a");
-    githubLink.className = "ytts-settings-github-link";
-    githubLink.href = "https://github.com/filipemanuelofs/youtube-timestamp-manager";
-    githubLink.target = "_blank";
-    githubLink.rel = "noopener noreferrer";
-    githubLink.title = "GitHub";
-
-    const svgNS = "http://www.w3.org/2000/svg";
-    const githubIcon = document.createElementNS(svgNS, "svg");
-    githubIcon.setAttribute("viewBox", "0 0 16 16");
-    const iconPath = document.createElementNS(svgNS, "path");
-    iconPath.setAttribute(
-      "d",
-      "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+    settingsTab.append(
+      el("label", { className: "ytts-setting-item" }, [
+        el("input", {
+          type: "checkbox",
+          id: "auto-cleanup-expired",
+          checked: ui.getAutoCleanupSetting(),
+        }),
+        el("span", [
+          "Automatically clean expired timestamps",
+          el("br"),
+          el("small", {
+            textContent:
+              "The expiration date is 1 month after the date the timestamp was added.",
+          }),
+        ]),
+      ]),
+      el(
+        "label",
+        { className: "ytts-setting-item", style: { marginTop: "12px" } },
+        [
+          el("input", {
+            type: "checkbox",
+            id: "start-minimized",
+            checked: ui.getStartMinimizedSetting(),
+          }),
+          el("span", { textContent: "Start widget minimized" }),
+        ],
+      ),
+      el("div", { className: "ytts-hotkey-row" }, [
+        el("span", { textContent: "Timestamp shortcut" }),
+        hotkeyField,
+        el("button", {
+          id: "ytts-hotkey-clear",
+          textContent: "Clear",
+          title: "Turn the shortcut off",
+          on: { click: () => setHotkeyField(null) },
+        }),
+      ]),
+      // Ação, não preferência: age no clique e não passa pelo Save.
+      el("button", {
+        id: "ytts-reset-position",
+        textContent: "Reset widget position",
+        on: {
+          click: () => {
+            drag.resetPosition();
+            showNotification("↩️ Widget position reset");
+          },
+        },
+      }),
     );
-    githubIcon.appendChild(iconPath);
-    githubLink.appendChild(githubIcon);
 
-    const saveBtn = document.createElement("button");
-    saveBtn.id = "ytts-save-settings";
-    saveBtn.textContent = "Save";
+    const saveBtn = el("button", {
+      id: "ytts-save-settings",
+      textContent: "Save",
+    });
 
-    const cancelBtn = document.createElement("button");
-    cancelBtn.id = "ytts-cancel-settings";
-    cancelBtn.textContent = "Cancel";
+    const cancelBtn = el("button", {
+      id: "ytts-cancel-settings",
+      textContent: "Cancel",
+    });
 
-    versionEl.appendChild(versionText);
-    versionEl.appendChild(separator);
-    versionEl.appendChild(githubLink);
-    footer.appendChild(versionEl);
-    footer.appendChild(saveBtn);
-    footer.appendChild(cancelBtn);
+    const footer = el("div", { className: "ytts-settings-footer" }, [
+      el("div", { className: "ytts-settings-version" }, [
+        el("span", { textContent: `v${__VERSION__}` }),
+        el("span", {
+          className: "ytts-settings-version-separator",
+          textContent: "|",
+        }),
+        el(
+          "a",
+          {
+            className: "ytts-settings-github-link",
+            href: "https://github.com/filipemanuelofs/youtube-timestamp-manager",
+            target: "_blank",
+            rel: "noopener noreferrer",
+            title: "GitHub",
+          },
+          [
+            el("svg", { attrs: { viewBox: "0 0 16 16" } }, [
+              el("path", { attrs: { d: GITHUB_ICON_PATH } }),
+            ]),
+          ],
+        ),
+      ]),
+      saveBtn,
+      cancelBtn,
+    ]);
 
-    content.appendChild(header);
-    content.appendChild(tabs);
-    content.appendChild(body);
-    content.appendChild(footer);
-    modal.appendChild(content);
+    const modal = el("div", { id: "ytts-settings-modal" }, [
+      el("div", { className: "ytts-settings-content" }, [
+        header,
+        tabs,
+        body,
+        footer,
+      ]),
+    ]);
+
     document.body.appendChild(modal);
 
     // Save grava preferência, e a aba de vídeos não tem preferência a gravar:
@@ -997,10 +967,12 @@ export const ui = {
     const videos = getAllSavedVideos();
 
     if (videos.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "ytts-video-empty";
-      empty.textContent = "No videos with timestamps yet.";
-      container.appendChild(empty);
+      container.appendChild(
+        el("p", {
+          className: "ytts-video-empty",
+          textContent: "No videos with timestamps yet.",
+        }),
+      );
       return;
     }
 
@@ -1021,63 +993,61 @@ export const ui = {
 
     videos.sort((a, b) => lastCreation(b) - lastCreation(a));
 
-    const list = document.createElement("ul");
-    list.className = "ytts-video-list";
+    const list = el("ul", { className: "ytts-video-list" });
 
     videos.forEach(({ videoId, title, timestamps }) => {
-      const li = document.createElement("li");
-      li.className = "ytts-video-item";
-      li.dataset.videoId = videoId;
-
-      const thumb = document.createElement("img");
-      thumb.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-      thumb.loading = "lazy";
-      thumb.referrerPolicy = "no-referrer";
-      thumb.alt = "";
-      // Vídeo removido responde 404 na miniatura: esconder mantém a linha legível.
-      thumb.addEventListener("error", () => {
-        thumb.style.display = "none";
-      });
-
-      const info = document.createElement("div");
-      info.className = "ytts-video-info";
-
       const created = firstCreation(timestamps);
-      if (created !== null) {
-        const date = document.createElement("span");
-        date.className = "ytts-video-date";
-        date.textContent = new Date(created).toLocaleDateString();
-        date.title = `First timestamp: ${date.textContent}`;
-        info.appendChild(date);
-      }
+      const createdLabel =
+        created === null ? null : new Date(created).toLocaleDateString();
 
-      const link = document.createElement("a");
-      link.className = "ytts-video-title";
-      link.href = `https://youtu.be/${videoId}`;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = title || videoId;
-      link.title = title || videoId;
-
-      info.appendChild(link);
-
-      const count = document.createElement("span");
-      count.className = "ytts-video-count";
-      count.textContent = `${timestamps.length}`;
-
-      const deleteBtn = document.createElement("span");
-      deleteBtn.classList.add("ytts-icon-btn");
-      deleteBtn.title = "Delete all timestamps of this video";
-      deleteBtn.textContent = "⛔";
-
-      deleteBtn.addEventListener("click", () => {
-        handlers.deleteVideoFromList(videoId, li);
+      const thumb = el("img", {
+        src: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+        loading: "lazy",
+        referrerPolicy: "no-referrer",
+        alt: "",
+        on: {
+          // Vídeo removido responde 404 na miniatura: esconder mantém a linha
+          // legível.
+          error: () => {
+            thumb.style.display = "none";
+          },
+        },
       });
 
-      li.appendChild(thumb);
-      li.appendChild(info);
-      li.appendChild(count);
-      li.appendChild(deleteBtn);
+      const li = el(
+        "li",
+        { className: "ytts-video-item", dataset: { videoId } },
+        [
+          thumb,
+          el("div", { className: "ytts-video-info" }, [
+            createdLabel &&
+              el("span", {
+                className: "ytts-video-date",
+                textContent: createdLabel,
+                title: `First timestamp: ${createdLabel}`,
+              }),
+            el("a", {
+              className: "ytts-video-title",
+              href: `https://youtu.be/${videoId}`,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              textContent: title || videoId,
+              title: title || videoId,
+            }),
+          ]),
+          el("span", {
+            className: "ytts-video-count",
+            textContent: `${timestamps.length}`,
+          }),
+          el("span", {
+            className: "ytts-icon-btn",
+            title: "Delete all timestamps of this video",
+            textContent: "⛔",
+            on: { click: () => handlers.deleteVideoFromList(videoId, li) },
+          }),
+        ],
+      );
+
       list.appendChild(li);
     });
 
