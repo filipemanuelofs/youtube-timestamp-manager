@@ -16,7 +16,8 @@
 - ⛔ **Apagar timestamps** um a um
 - ☑️ **Apagar em lote** - marque vários timestamps e remova todos de uma vez
 - 📍 **Marcadores na barra de progresso** - cada timestamp vira um pino clicável no scrubber do vídeo
-- 💾 **Salvamento automático** - os timestamps ficam guardados por vídeo e expiram em 30 dias
+- 💾 **Salvamento automático** - os timestamps ficam guardados por vídeo e
+  expiram no prazo que você escolher (30 dias por padrão)
 - ⠿ **Arrastar o painel** - pegue pela alça e solte onde quiser; o lugar fica guardado
 - 🔽 **Minimizar o painel** para não atrapalhar a experiência de assistir
 - ⚡ **Navegação rápida** - clique no timestamp para pular para aquele momento
@@ -105,14 +106,18 @@ Os controles de seleção só aparecem quando a lista passa de 3 timestamps — 
 ## ⚙️ Configurações
 
 Os timestamps são salvos automaticamente por vídeo no `localStorage` do navegador, e
-cada um expira 30 dias depois de criado. Clique em ⚙️ no cabeçalho do painel para
-abrir as configurações:
+cada um expira quando fica mais velho que o prazo de retenção. Clique em ⚙️ no
+cabeçalho do painel para abrir as configurações:
 
-| Configuração                               | Padrão   | O que faz                                                       |
-| ------------------------------------------ | -------- | --------------------------------------------------------------- |
-| **Automatically clean expired timestamps** | Desligado | Descarta timestamps com mais de 30 dias quando o vídeo carrega  |
-| **Start widget minimized**                 | Ligado   | Abre o painel recolhido, mostrando só o cabeçalho               |
-| **Timestamp shortcut**                     | Shift+S  | Atalho de teclado que adiciona um timestamp                     |
+| Configuração                               | Padrão    | O que faz                                                       |
+| ------------------------------------------ | --------- | --------------------------------------------------------------- |
+| **Automatically clean expired timestamps** | Desligado | Descarta os timestamps expirados quando o vídeo carrega          |
+| **Expire timestamps after**                | 30 dias   | Por quanto tempo um timestamp é guardado, contado da criação     |
+| **Start widget minimized**                 | Ligado    | Abre o painel recolhido, mostrando só o cabeçalho               |
+| **Timestamp shortcut**                     | Shift+S   | Atalho de teclado que adiciona um timestamp                     |
+
+O prazo vale para todos os timestamps, inclusive os antigos: diminuí-lo faz os
+mais velhos expirarem na hora.
 
 Para trocar o atalho, clique no campo e aperte a combinação desejada; o botão
 **Clear** ao lado desliga o atalho. O atalho é ignorado enquanto você digita —
@@ -234,7 +239,8 @@ Todo módulo de `src/` tem uma suíte: os helpers em `tests/utils/`, o resto em
 
 ### Os timestamps sumiram
 
-- Timestamps expiram 30 dias depois de criados
+- Timestamps expiram quando ficam mais velhos que o prazo definido em ⚙️
+  (30 dias por padrão), contado a partir da data de criação
 - Com "Automatically clean expired timestamps" ligado, eles são descartados na
   próxima vez que você abrir o vídeo
 - Ficam guardados no `localStorage` do navegador, então limpar os dados do site ou

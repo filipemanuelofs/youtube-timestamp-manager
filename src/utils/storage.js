@@ -7,11 +7,15 @@ const PREFIX = "ytts_";
 // 11 caracteres de `[A-Za-z0-9_-]` que o YouTube usa).
 const META_PREFIX = "yttsmeta_";
 
+// Prazo de retenção padrão, em dias. Vale para quem nunca abriu as
+// configurações e para todo valor gravado que não sirva como número de dias.
+const DEFAULT_RETENTION_DAYS = 30;
+
 /**
  * Salva um array de timestamps no localStorage para o vídeo indicado.
  * Chave de armazenamento: `ytts_${videoId}`.
  * @param {string} videoId - ID do vídeo.
- * @param {Array<{time: number, note: string, creation: string, expiration: string}>} timestamps - Lista de timestamps a salvar.
+ * @param {Array<{time: number, note: string, creation: string}>} timestamps - Lista de timestamps a salvar.
  */
 export function saveTimestamps(videoId, timestamps) {
   try {
@@ -24,7 +28,7 @@ export function saveTimestamps(videoId, timestamps) {
 /**
  * Carrega os timestamps salvos no localStorage para o vídeo indicado.
  * @param {string} videoId - ID do vídeo.
- * @returns {Array<{time: number, note: string, creation: string, expiration: string}>} Lista de timestamps ou array vazio se não encontrado.
+ * @returns {Array<{time: number, note: string, creation: string}>} Lista de timestamps ou array vazio se não encontrado.
  */
 export function loadTimestamps(videoId) {
   try {
@@ -126,13 +130,33 @@ export function deleteVideoTimestamps(videoId) {
 }
 
 /**
+ * Lê o prazo de retenção configurado, em dias.
+ * Chave ausente, valor não numérico, menor que 1 ou `localStorage` inacessível
+ * caem no padrão — o campo é global e um valor corrompido não pode virar uma
+ * limpeza mais agressiva do que a que o usuário escolheu.
+ * @returns {number} Número inteiro de dias, sempre `>= 1`.
+ */
+export function getRetentionDays() {
+  try {
+    const days = parseInt(localStorage.getItem("ytts_retention_days"), 10);
+    return Number.isNaN(days) || days < 1 ? DEFAULT_RETENTION_DAYS : days;
+  } catch {
+    return DEFAULT_RETENTION_DAYS;
+  }
+}
+
+/**
  * Remove timestamps expirados de todos os vídeos no localStorage.
- * Um timestamp é considerado expirado quando `expiration < now`.
+ * Um timestamp é considerado expirado quando `creation` é mais antigo que o
+ * prazo de retenção configurado; item sem `creation` legível é mantido.
  * Vídeos que ficam sem timestamps válidos têm sua chave removida completamente.
  * @returns {{ cleanedCount: number, affectedVideoIds: string[] }} Quantidade de timestamps removidos e IDs dos vídeos afetados.
  */
 export function removeExpiredFromStorage() {
-  const now = new Date().toISOString();
+  // Calculado uma vez, fora do laço: o prazo é global e reler a configuração a
+  // cada item faria itens da mesma varredura serem julgados por instantes
+  // diferentes de `now`.
+  const cutoff = Date.now() - getRetentionDays() * 24 * 60 * 60 * 1000;
   let cleanedCount = 0;
   const affectedVideoIds = [];
   const emptiedVideoIds = [];
@@ -151,9 +175,13 @@ export function removeExpiredFromStorage() {
           // os vídeos ainda não visitados no laço nunca são limpos.
           if (!Array.isArray(timestamps)) continue;
 
-          const valid = timestamps.filter(
-            (ts) => !ts.expiration || ts.expiration > now,
-          );
+          const valid = timestamps.filter((ts) => {
+            const created = Date.parse(ts.creation);
+            // `creation` ausente ou ilegível vira NaN: sem âncora temporal não
+            // há como afirmar que expirou, e apagar destruiria dado do usuário
+            // por causa de um campo que faltou.
+            return Number.isNaN(created) || created >= cutoff;
+          });
 
           if (valid.length !== timestamps.length) {
             const videoId = key.replace(PREFIX, "");

@@ -16,7 +16,8 @@
 - ⛔ **Delete unwanted timestamps** one by one
 - ☑️ **Bulk delete** - select multiple timestamps and remove them in one go
 - 📍 **Progress bar markers** - every timestamp gets a clickable pin on the video scrubber
-- 💾 **Automatic saving** - timestamps persist per video and expire after 30 days
+- 💾 **Automatic saving** - timestamps persist per video and expire after a
+  window you choose (30 days by default)
 - ⠿ **Drag the panel anywhere** - grab the handle and drop it where it suits you; the spot is remembered
 - 🔽 **Minimize panel** to avoid interfering with viewing experience
 - ⚡ **Quick navigation** - click timestamp to jump to that moment
@@ -105,14 +106,18 @@ The selection controls only show up once the list has more than 3 timestamps —
 ## ⚙️ Settings
 
 Timestamps are saved automatically per video in the browser's `localStorage`, and
-each one expires 30 days after it was created. Click ⚙️ in the panel header to
-open the settings:
+each one expires once it is older than the retention window. Click ⚙️ in the
+panel header to open the settings:
 
-| Setting                                    | Default | What it does                                           |
-| ------------------------------------------ | ------- | ------------------------------------------------------ |
-| **Automatically clean expired timestamps** | Off     | Drops timestamps older than 30 days when a video loads |
-| **Start widget minimized**                 | On      | Opens the panel collapsed, showing only the header     |
-| **Timestamp shortcut**                     | Shift+S | Keyboard shortcut that adds a timestamp                |
+| Setting                                    | Default | What it does                                             |
+| ------------------------------------------ | ------- | -------------------------------------------------------- |
+| **Automatically clean expired timestamps** | Off     | Drops expired timestamps when a video loads              |
+| **Expire timestamps after**                | 30 days | How long a timestamp is kept, counted from its creation  |
+| **Start widget minimized**                 | On      | Opens the panel collapsed, showing only the header       |
+| **Timestamp shortcut**                     | Shift+S | Keyboard shortcut that adds a timestamp                  |
+
+The retention window applies to every timestamp, old ones included: lowering it
+makes older timestamps expire right away.
 
 To change the shortcut, click the field and press the combination you want; the
 **Clear** button next to it turns the shortcut off. The shortcut is ignored while
@@ -234,7 +239,8 @@ Every module under `src/` has a suite: helpers in `tests/utils/`, the rest in
 
 ### Timestamps disappeared
 
-- Timestamps expire 30 days after they were created
+- Timestamps expire once they are older than the retention window set in ⚙️
+  (30 days by default), counted from the date they were created
 - If "Automatically clean expired timestamps" is on, they are dropped the next
   time you open the video
 - They are stored in the browser's `localStorage`, so clearing site data or

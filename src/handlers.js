@@ -267,8 +267,7 @@ export const handlers = {
       const time = parseInt(item.querySelector("a").dataset.time);
       const note = item.querySelector(".ytts-note").value;
       const creation = item.dataset.creation;
-      const expiration = item.dataset.expiration;
-      timestamps.push({ time, note, creation, expiration });
+      timestamps.push({ time, note, creation });
     });
 
     if (timestamps.length > 0) {
@@ -291,8 +290,8 @@ export const handlers = {
     if (!videoId) return;
 
     const savedTimestamps = loadTimestamps(videoId);
-    savedTimestamps.forEach(({ time, note, creation, expiration }) => {
-      ui.createTimestampItem(time, note, creation, expiration);
+    savedTimestamps.forEach(({ time, note, creation }) => {
+      ui.createTimestampItem(time, note, creation);
     });
 
     if (savedTimestamps.length > 0) {

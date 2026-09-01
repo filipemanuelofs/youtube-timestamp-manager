@@ -5,7 +5,7 @@ import { drag } from "./drag.js";
 import { showNotification } from "./utils/notification.js";
 import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
-import { getAllSavedVideos } from "./utils/storage.js";
+import { getAllSavedVideos, getRetentionDays } from "./utils/storage.js";
 import { getVideoId } from "./utils/video.js";
 import {
   DEFAULT_HOTKEY,
@@ -276,7 +276,8 @@ const STYLES = `
     accent-color: #4FC3F7;
     cursor: pointer;
   }
-  .ytts-hotkey-row {
+  .ytts-hotkey-row,
+  .ytts-retention-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -284,8 +285,8 @@ const STYLES = `
     color: white;
     font-size: 14px;
   }
-  #ytts-hotkey-field {
-    flex: 1;
+  #ytts-hotkey-field,
+  #ytts-retention-days {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -293,8 +294,14 @@ const STYLES = `
     padding: 6px 10px;
     font-size: 12px;
     text-align: center;
+  }
+  #ytts-hotkey-field {
+    flex: 1;
     cursor: pointer;
     caret-color: transparent;
+  }
+  #ytts-retention-days {
+    width: 60px;
   }
   #ytts-hotkey-field.capturing {
     border-color: #4FC3F7;
@@ -472,9 +479,7 @@ export const ui = {
    * @param {string} [note=""] - Nota inicial para o timestamp.
    * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
    */
-  createTimestampItem(time, note = "", creation = null, expiration = null) {
-    const now = new Date();
-
+  createTimestampItem(time, note = "", creation = null) {
     const a = el("a");
     handlers.updateStamp(a, time);
 
@@ -502,10 +507,7 @@ export const ui = {
       "li",
       {
         dataset: {
-          creation: creation || now.toISOString(),
-          expiration:
-            expiration ||
-            new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          creation: creation || new Date().toISOString(),
         },
       },
       [
@@ -575,7 +577,8 @@ export const ui = {
 
     if (selectAllBox) {
       selectAllBox.style.display = display;
-      selectAllBox.checked = selectedCount > 0 && selectedCount === boxes.length;
+      selectAllBox.checked =
+        selectedCount > 0 && selectedCount === boxes.length;
       selectAllBox.indeterminate =
         selectedCount > 0 && selectedCount < boxes.length;
     }
@@ -845,9 +848,20 @@ export const ui = {
           el("br"),
           el("small", {
             textContent:
-              "The expiration date is 1 month after the date the timestamp was added.",
+              "A timestamp expires once it is older than the window set below.",
           }),
         ]),
+      ]),
+      el("div", { className: "ytts-retention-row" }, [
+        el("span", { textContent: "Expire timestamps after" }),
+        el("input", {
+          type: "number",
+          id: "ytts-retention-days",
+          min: "1",
+          step: "1",
+          value: ui.getRetentionDaysSetting(),
+        }),
+        el("span", { textContent: "days" }),
       ]),
       el(
         "label",
@@ -1067,6 +1081,14 @@ export const ui = {
   },
 
   /**
+   * Lê o prazo de retenção configurado, em dias.
+   * @returns {number} Número inteiro de dias, sempre `>= 1`.
+   */
+  getRetentionDaysSetting() {
+    return getRetentionDays();
+  },
+
+  /**
    * Lê o atalho de teclado configurado para criar timestamp.
    * Chave ausente devolve o atalho de fábrica; `null` gravado significa atalho
    * desligado pelo usuário; valor corrompido cai no padrão.
@@ -1107,6 +1129,29 @@ export const ui = {
     // O campo de atalho guarda a combinação capturada no próprio `dataset`, e
     // só o Save a promove a preferência — fechar no Cancel descarta a captura.
     const hotkeyField = document.querySelector("#ytts-hotkey-field");
+    // Só dígitos. `parseInt` pararia no primeiro caractere não numérico e
+    // aceitaria calado o que o campo `type="number"` deixa digitar: "1e3"
+    // viraria 1 e "7.5" viraria 7 — uma janela muito mais curta que a pedida,
+    // que com a limpeza automática ligada apaga timestamps na mesma hora.
+    const retentionField = document.querySelector("#ytts-retention-days");
+    const retentionRaw = retentionField ? retentionField.value.trim() : "";
+    const retentionDays = /^\d+$/.test(retentionRaw)
+      ? Number(retentionRaw)
+      : NaN;
+
+    // Prazo inválido cancela o Save inteiro e mantém o modal aberto: descartar
+    // só esse campo e ainda anunciar "Settings saved!" deixaria o usuário
+    // achando que gravou um prazo que continua sendo o antigo.
+    if (
+      retentionField &&
+      !(Number.isInteger(retentionDays) && retentionDays >= 1)
+    ) {
+      showNotification(
+        "❌ Expiration window must be a whole number of days, 1 or more",
+        2000,
+      );
+      return;
+    }
 
     try {
       localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
@@ -1116,6 +1161,9 @@ export const ui = {
           "ytts_hotkey",
           hotkeyField.dataset.hotkey || "null",
         );
+      }
+      if (retentionField) {
+        localStorage.setItem("ytts_retention_days", retentionDays.toString());
       }
 
       if (autoCleanup) {

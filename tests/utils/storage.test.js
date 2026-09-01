@@ -5,6 +5,7 @@ import {
   getAllSavedVideos,
   deleteVideoTimestamps,
   removeExpiredFromStorage,
+  getRetentionDays,
   saveVideoTitle,
   loadVideoTitle,
   deleteVideoTitle,
@@ -12,6 +13,7 @@ import {
 
 const past = new Date(Date.now() - 1000).toISOString();
 const future = new Date(Date.now() + 86400000).toISOString();
+const daysAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
 
 describe("saveTimestamps / loadTimestamps", () => {
   beforeEach(() => localStorage.clear());
@@ -144,13 +146,49 @@ describe("deleteVideoTimestamps", () => {
   });
 });
 
+describe("getRetentionDays", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to 30 when the key is absent", () => {
+    expect(getRetentionDays()).toBe(30);
+  });
+
+  it("reads the stored number of days", () => {
+    localStorage.setItem("ytts_retention_days", "7");
+    expect(getRetentionDays()).toBe(7);
+  });
+
+  it("falls back to 30 for zero", () => {
+    localStorage.setItem("ytts_retention_days", "0");
+    expect(getRetentionDays()).toBe(30);
+  });
+
+  it("falls back to 30 for a non-numeric value", () => {
+    localStorage.setItem("ytts_retention_days", "abc");
+    expect(getRetentionDays()).toBe(30);
+  });
+
+  it("falls back to 30 for an empty value", () => {
+    localStorage.setItem("ytts_retention_days", "");
+    expect(getRetentionDays()).toBe(30);
+  });
+
+  it("falls back to 30 when localStorage is unreachable", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("SecurityError");
+    });
+    expect(getRetentionDays()).toBe(30);
+    vi.restoreAllMocks();
+  });
+});
+
 describe("removeExpiredFromStorage", () => {
   beforeEach(() => localStorage.clear());
 
   it("removes expired timestamps", () => {
     saveTimestamps("vid1", [
-      { time: 10, note: "", expiration: past },
-      { time: 20, note: "", expiration: future },
+      { time: 10, note: "", creation: daysAgo(40) },
+      { time: 20, note: "", creation: daysAgo(3) },
     ]);
     const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
     expect(cleanedCount).toBe(1);
@@ -161,34 +199,70 @@ describe("removeExpiredFromStorage", () => {
   });
 
   it("removes key if all timestamps expired", () => {
-    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
     removeExpiredFromStorage();
     expect(loadTimestamps("vid1")).toEqual([]);
     expect(localStorage.getItem("ytts_vid1")).toBeNull();
   });
 
-  it("keeps timestamps without expiration field", () => {
+  it("keeps timestamps without a creation field", () => {
     saveTimestamps("vid1", [{ time: 10, note: "" }]);
     const { cleanedCount } = removeExpiredFromStorage();
     expect(cleanedCount).toBe(0);
     expect(loadTimestamps("vid1")).toHaveLength(1);
   });
 
+  it("keeps timestamps whose creation does not parse as a date", () => {
+    saveTimestamps("vid1", [{ time: 10, note: "", creation: "not a date" }]);
+    const { cleanedCount } = removeExpiredFromStorage();
+    expect(cleanedCount).toBe(0);
+    expect(loadTimestamps("vid1")).toHaveLength(1);
+  });
+
+  it("honors a shorter configured retention", () => {
+    localStorage.setItem("ytts_retention_days", "7");
+    saveTimestamps("vid1", [
+      { time: 10, note: "old", creation: daysAgo(10) },
+      { time: 20, note: "recent", creation: daysAgo(3) },
+    ]);
+    const { cleanedCount } = removeExpiredFromStorage();
+    expect(cleanedCount).toBe(1);
+    expect(loadTimestamps("vid1")).toHaveLength(1);
+    expect(loadTimestamps("vid1")[0].note).toBe("recent");
+  });
+
+  it("keeps that same stamp under the default 30 day retention", () => {
+    saveTimestamps("vid1", [{ time: 10, note: "old", creation: daysAgo(10) }]);
+    const { cleanedCount } = removeExpiredFromStorage();
+    expect(cleanedCount).toBe(0);
+    expect(loadTimestamps("vid1")).toHaveLength(1);
+  });
+
+  // Registros de versões antigas guardam `expiration`; ele não manda mais.
+  it("ignores the legacy expiration field", () => {
+    saveTimestamps("vid1", [
+      { time: 10, note: "", creation: daysAgo(1), expiration: past },
+    ]);
+    const { cleanedCount } = removeExpiredFromStorage();
+    expect(cleanedCount).toBe(0);
+    expect(loadTimestamps("vid1")).toHaveLength(1);
+  });
+
   it("returns cleanedCount 0 when nothing expired", () => {
-    saveTimestamps("vid1", [{ time: 10, expiration: future }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(3) }]);
     const { cleanedCount } = removeExpiredFromStorage();
     expect(cleanedCount).toBe(0);
   });
 
   it("returns empty affectedVideoIds when nothing cleaned", () => {
-    saveTimestamps("vid1", [{ time: 10, expiration: future }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(3) }]);
     const { affectedVideoIds } = removeExpiredFromStorage();
     expect(affectedVideoIds).toHaveLength(0);
   });
 
   it("sweeps every video in one pass", () => {
-    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
-    saveTimestamps("vid2", [{ time: 20, expiration: past }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
+    saveTimestamps("vid2", [{ time: 20, creation: daysAgo(40) }]);
     const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
     expect(cleanedCount).toBe(2);
     expect(affectedVideoIds.sort()).toEqual(["vid1", "vid2"]);
@@ -198,8 +272,8 @@ describe("removeExpiredFromStorage", () => {
   // configuração gravadas depois dos vídeos são as primeiras a ser lidas: antes
   // da guarda, o TypeError delas abortava a passagem e nenhum vídeo era limpo.
   it("sweeps every video even with the ytts_ config keys present", () => {
-    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
-    saveTimestamps("vid2", [{ time: 20, expiration: past }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
+    saveTimestamps("vid2", [{ time: 20, creation: daysAgo(40) }]);
     localStorage.setItem("ytts_auto_cleanup", "true");
     localStorage.setItem("ytts_start_minimized", "false");
     localStorage.setItem("ytts_pane_position", JSON.stringify({ top: 1, left: 2 }));
@@ -215,7 +289,7 @@ describe("removeExpiredFromStorage", () => {
   });
 
   it("removes the title when the video loses every timestamp", () => {
-    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
     saveVideoTitle("vid1", "Meu Vídeo");
     removeExpiredFromStorage();
     expect(localStorage.getItem("ytts_vid1")).toBeNull();
@@ -224,8 +298,8 @@ describe("removeExpiredFromStorage", () => {
 
   it("keeps the title when the video still has valid timestamps", () => {
     saveTimestamps("vid1", [
-      { time: 10, expiration: past },
-      { time: 20, expiration: future },
+      { time: 10, creation: daysAgo(40) },
+      { time: 20, creation: daysAgo(3) },
     ]);
     saveVideoTitle("vid1", "Meu Vídeo");
     removeExpiredFromStorage();
@@ -234,10 +308,10 @@ describe("removeExpiredFromStorage", () => {
 
   it("sweeps every video with yttsmeta_ keys interleaved", () => {
     saveVideoTitle("vid1", "Um");
-    saveTimestamps("vid2", [{ time: 20, expiration: past }]);
+    saveTimestamps("vid2", [{ time: 20, creation: daysAgo(40) }]);
     saveVideoTitle("vid2", "Dois");
-    saveTimestamps("vid3", [{ time: 30, expiration: past }]);
-    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveTimestamps("vid3", [{ time: 30, creation: daysAgo(40) }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
 
     const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
 
@@ -248,7 +322,7 @@ describe("removeExpiredFromStorage", () => {
 
   it("leaves non-ytts_ keys alone", () => {
     localStorage.setItem("other_key", "not json");
-    saveTimestamps("vid1", [{ time: 10, expiration: past }]);
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
     removeExpiredFromStorage();
     expect(localStorage.getItem("other_key")).toBe("not json");
   });

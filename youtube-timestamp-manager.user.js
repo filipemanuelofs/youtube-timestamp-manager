@@ -766,8 +766,16 @@
     }
     deleteVideoTitle(videoId);
   }
+  function getRetentionDays() {
+    try {
+      const days = parseInt(localStorage.getItem("ytts_retention_days"), 10);
+      return Number.isNaN(days) || days < 1 ? DEFAULT_RETENTION_DAYS : days;
+    } catch {
+      return DEFAULT_RETENTION_DAYS;
+    }
+  }
   function removeExpiredFromStorage() {
-    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const cutoff = Date.now() - getRetentionDays() * 24 * 60 * 60 * 1e3;
     let cleanedCount = 0;
     const affectedVideoIds = [];
     const emptiedVideoIds = [];
@@ -779,9 +787,10 @@
           if (data) {
             const timestamps = JSON.parse(data);
             if (!Array.isArray(timestamps)) continue;
-            const valid = timestamps.filter(
-              (ts) => !ts.expiration || ts.expiration > now
-            );
+            const valid = timestamps.filter((ts) => {
+              const created = Date.parse(ts.creation);
+              return Number.isNaN(created) || created >= cutoff;
+            });
             if (valid.length !== timestamps.length) {
               const videoId = key.replace(PREFIX, "");
               cleanedCount += timestamps.length - valid.length;
@@ -805,11 +814,12 @@
     emptiedVideoIds.forEach((videoId) => deleteVideoTitle(videoId));
     return { cleanedCount, affectedVideoIds };
   }
-  var PREFIX, META_PREFIX;
+  var PREFIX, META_PREFIX, DEFAULT_RETENTION_DAYS;
   var init_storage = __esm({
     "src/utils/storage.js"() {
       PREFIX = "ytts_";
       META_PREFIX = "yttsmeta_";
+      DEFAULT_RETENTION_DAYS = 30;
     }
   });
 
@@ -1140,7 +1150,8 @@
     accent-color: #4FC3F7;
     cursor: pointer;
   }
-  .ytts-hotkey-row {
+  .ytts-hotkey-row,
+  .ytts-retention-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1148,8 +1159,8 @@
     color: white;
     font-size: 14px;
   }
-  #ytts-hotkey-field {
-    flex: 1;
+  #ytts-hotkey-field,
+  #ytts-retention-days {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1157,8 +1168,14 @@
     padding: 6px 10px;
     font-size: 12px;
     text-align: center;
+  }
+  #ytts-hotkey-field {
+    flex: 1;
     cursor: pointer;
     caret-color: transparent;
+  }
+  #ytts-retention-days {
+    width: 60px;
   }
   #ytts-hotkey-field.capturing {
     border-color: #4FC3F7;
@@ -1335,8 +1352,7 @@
          * @param {string} [note=""] - Nota inicial para o timestamp.
          * @returns {HTMLInputElement} Campo de texto da nota, já inserido no DOM.
          */
-        createTimestampItem(time, note = "", creation = null, expiration = null) {
-          const now = /* @__PURE__ */ new Date();
+        createTimestampItem(time, note = "", creation = null) {
           const a = el("a");
           handlers.updateStamp(a, time);
           const selectBox = el("input", {
@@ -1361,8 +1377,7 @@
             "li",
             {
               dataset: {
-                creation: creation || now.toISOString(),
-                expiration: expiration || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3).toISOString()
+                creation: creation || (/* @__PURE__ */ new Date()).toISOString()
               }
             },
             [
@@ -1637,9 +1652,20 @@
                 "Automatically clean expired timestamps",
                 el("br"),
                 el("small", {
-                  textContent: "The expiration date is 1 month after the date the timestamp was added."
+                  textContent: "A timestamp expires once it is older than the window set below."
                 })
               ])
+            ]),
+            el("div", { className: "ytts-retention-row" }, [
+              el("span", { textContent: "Expire timestamps after" }),
+              el("input", {
+                type: "number",
+                id: "ytts-retention-days",
+                min: "1",
+                step: "1",
+                value: ui.getRetentionDaysSetting()
+              }),
+              el("span", { textContent: "days" })
             ]),
             el(
               "label",
@@ -1828,6 +1854,13 @@
           }
         },
         /**
+         * Lê o prazo de retenção configurado, em dias.
+         * @returns {number} Número inteiro de dias, sempre `>= 1`.
+         */
+        getRetentionDaysSetting() {
+          return getRetentionDays();
+        },
+        /**
          * Lê o atalho de teclado configurado para criar timestamp.
          * Chave ausente devolve o atalho de fábrica; `null` gravado significa atalho
          * desligado pelo usuário; valor corrompido cai no padrão.
@@ -1864,6 +1897,16 @@
           const autoCleanup = document.querySelector("#auto-cleanup-expired").checked;
           const startMinimized = document.querySelector("#start-minimized").checked;
           const hotkeyField = document.querySelector("#ytts-hotkey-field");
+          const retentionField = document.querySelector("#ytts-retention-days");
+          const retentionRaw = retentionField ? retentionField.value.trim() : "";
+          const retentionDays = /^\d+$/.test(retentionRaw) ? Number(retentionRaw) : NaN;
+          if (retentionField && !(Number.isInteger(retentionDays) && retentionDays >= 1)) {
+            showNotification(
+              "\u274C Expiration window must be a whole number of days, 1 or more",
+              2e3
+            );
+            return;
+          }
           try {
             localStorage.setItem("ytts_auto_cleanup", autoCleanup.toString());
             localStorage.setItem("ytts_start_minimized", startMinimized.toString());
@@ -1872,6 +1915,9 @@
                 "ytts_hotkey",
                 hotkeyField.dataset.hotkey || "null"
               );
+            }
+            if (retentionField) {
+              localStorage.setItem("ytts_retention_days", retentionDays.toString());
             }
             if (autoCleanup) {
               handlers.cleanExpired();
@@ -2102,8 +2148,7 @@
             const time = parseInt(item.querySelector("a").dataset.time);
             const note = item.querySelector(".ytts-note").value;
             const creation = item.dataset.creation;
-            const expiration = item.dataset.expiration;
-            timestamps.push({ time, note, creation, expiration });
+            timestamps.push({ time, note, creation });
           });
           if (timestamps.length > 0) {
             saveTimestamps(videoId, timestamps);
@@ -2122,8 +2167,8 @@
           const videoId = getVideoId();
           if (!videoId) return;
           const savedTimestamps = loadTimestamps(videoId);
-          savedTimestamps.forEach(({ time, note, creation, expiration }) => {
-            ui.createTimestampItem(time, note, creation, expiration);
+          savedTimestamps.forEach(({ time, note, creation }) => {
+            ui.createTimestampItem(time, note, creation);
           });
           if (savedTimestamps.length > 0) {
             showNotification(

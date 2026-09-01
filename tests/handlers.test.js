@@ -20,6 +20,8 @@ import {
 
 const future = new Date(Date.now() + 86400000).toISOString();
 const past = new Date(Date.now() - 1000).toISOString();
+// Além do prazo de retenção padrão (30 dias), então a limpeza leva.
+const expired = new Date(Date.now() - 40 * 86400000).toISOString();
 
 let copySpy;
 let notifySpy;
@@ -404,13 +406,13 @@ describe("copyIndividualTimestamp", () => {
 });
 
 describe("saveCurrentTimestamps", () => {
-  it("stores time, note and the lifetime dates from the row", () => {
-    const input = ui.createTimestampItem(15, "note A", past, future);
+  it("stores time, note and the creation date from the row", () => {
+    const input = ui.createTimestampItem(15, "note A", past);
     input.value = "edited";
 
     handlers.saveCurrentTimestamps();
     expect(loadTimestamps("vid1")).toEqual([
-      { time: 15, note: "edited", creation: past, expiration: future },
+      { time: 15, note: "edited", creation: past },
     ]);
   });
 
@@ -491,7 +493,7 @@ describe("loadSavedTimestamps", () => {
     ]);
   });
 
-  it("preserves the stored creation and expiration dates", () => {
+  it("preserves the stored creation date", () => {
     saveTimestamps("vid1", [
       { time: 10, note: "a", creation: past, expiration: future },
     ]);
@@ -499,7 +501,19 @@ describe("loadSavedTimestamps", () => {
     handlers.loadSavedTimestamps();
     const li = document.querySelector("#ytls-pane ul li:not(.now-playing)");
     expect(li.dataset.creation).toBe(past);
-    expect(li.dataset.expiration).toBe(future);
+    expect(li.dataset.expiration).toBeUndefined();
+  });
+
+  it("does not write the legacy expiration field back on save", () => {
+    saveTimestamps("vid1", [
+      { time: 10, note: "a", creation: past, expiration: future },
+    ]);
+
+    handlers.loadSavedTimestamps();
+    handlers.saveCurrentTimestamps();
+    expect(loadTimestamps("vid1")).toEqual([
+      { time: 10, note: "a", creation: past },
+    ]);
   });
 
   it("announces how many were loaded", () => {
@@ -529,7 +543,7 @@ describe("loadSavedTimestamps", () => {
 describe("cleanExpired", () => {
   it("drops expired stamps and redraws the list of the current video", () => {
     saveTimestamps("vid1", [
-      { time: 10, note: "gone", creation: past, expiration: past },
+      { time: 10, note: "gone", creation: expired },
       { time: 20, note: "kept", creation: past, expiration: future },
     ]);
     handlers.loadSavedTimestamps();
@@ -545,7 +559,7 @@ describe("cleanExpired", () => {
       { time: 20, note: "kept", creation: past, expiration: future },
     ]);
     saveTimestamps("vid2", [
-      { time: 30, note: "gone", creation: past, expiration: past },
+      { time: 30, note: "gone", creation: expired },
     ]);
     handlers.loadSavedTimestamps();
     notifySpy.mockClear();

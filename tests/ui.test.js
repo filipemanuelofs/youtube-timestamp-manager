@@ -68,20 +68,17 @@ describe("createTimestampItem", () => {
     expect(li.querySelectorAll("span.ytts-icon-btn")).toHaveLength(2);
   });
 
-  it("defaults the expiration to 30 days after creation", () => {
+  it("stamps the creation date and no expiration", () => {
     const li = ui.createTimestampItem(10).parentElement;
-    const lifetime =
-      Date.parse(li.dataset.expiration) - Date.parse(li.dataset.creation);
-    expect(lifetime).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(Date.parse(li.dataset.creation)).not.toBeNaN();
+    expect(li.dataset.expiration).toBeUndefined();
   });
 
-  it("keeps the dates it is given", () => {
+  it("keeps the creation date it is given", () => {
     const creation = "2025-01-01T00:00:00.000Z";
-    const expiration = "2025-02-01T00:00:00.000Z";
-    const li = ui.createTimestampItem(10, "", creation, expiration).parentElement;
+    const li = ui.createTimestampItem(10, "", creation).parentElement;
 
     expect(li.dataset.creation).toBe(creation);
-    expect(li.dataset.expiration).toBe(expiration);
   });
 
   it("inserts rows above the now-playing row, in creation order", () => {
@@ -131,7 +128,10 @@ describe("createTimestampItem", () => {
     const save = vi
       .spyOn(handlers, "saveCurrentTimestamps")
       .mockImplementation(() => {});
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
     const input = ui.createTimestampItem(10);
 
     input.parentElement.querySelectorAll("span")[1].click();
@@ -140,7 +140,10 @@ describe("createTimestampItem", () => {
   });
 
   it("keeps the row when the delete is cancelled", () => {
-    vi.stubGlobal("confirm", vi.fn(() => false));
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => false),
+    );
     const input = ui.createTimestampItem(10);
 
     input.parentElement.querySelectorAll("span")[1].click();
@@ -358,7 +361,10 @@ describe("init", () => {
     const dragInit = vi.spyOn(drag, "init");
     const pane = ui.init();
 
-    expect(dragInit).toHaveBeenCalledWith(pane, pane.querySelector(".ytls-header"));
+    expect(dragInit).toHaveBeenCalledWith(
+      pane,
+      pane.querySelector(".ytls-header"),
+    );
   });
 
   it("mounts already moved when a position was saved", () => {
@@ -441,12 +447,24 @@ describe("settings", () => {
     expect(ui.getStartMinimizedSetting()).toBe(false);
   });
 
+  it("reads the retention window, defaulting to 30 days", () => {
+    expect(ui.getRetentionDaysSetting()).toBe(30);
+    localStorage.setItem("ytts_retention_days", "7");
+    expect(ui.getRetentionDaysSetting()).toBe(7);
+  });
+
   it("falls back to the factory hotkey when nothing is stored", () => {
     expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
   });
 
   it("reads the stored hotkey", () => {
-    const stored = { key: "D", ctrl: true, alt: false, shift: false, meta: false };
+    const stored = {
+      key: "D",
+      ctrl: true,
+      alt: false,
+      shift: false,
+      meta: false,
+    };
     localStorage.setItem("ytts_hotkey", JSON.stringify(stored));
     expect(ui.getHotkeySetting()).toEqual(stored);
   });
@@ -462,6 +480,68 @@ describe("settings", () => {
 
     localStorage.setItem("ytts_hotkey", JSON.stringify({ key: "" }));
     expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
+  });
+
+  it("opens the retention field on the configured window", () => {
+    ui.openSettingsModal();
+    expect(document.querySelector("#ytts-retention-days").value).toBe("30");
+
+    document.querySelector("#ytts-cancel-settings").click();
+    localStorage.setItem("ytts_retention_days", "7");
+    ui.openSettingsModal();
+    expect(document.querySelector("#ytts-retention-days").value).toBe("7");
+  });
+
+  it("persists the retention window typed into the field", () => {
+    ui.openSettingsModal();
+    document.querySelector("#ytts-retention-days").value = "7";
+
+    document.querySelector("#ytts-save-settings").click();
+    expect(localStorage.getItem("ytts_retention_days")).toBe("7");
+  });
+
+  // "1e3" e "7.5" passam pelo campo `type="number"`, e `parseInt` os lia como
+  // 1 e 7 — janela drasticamente menor que a digitada.
+  it("keeps the stored window when the field holds no usable number", () => {
+    localStorage.setItem("ytts_retention_days", "7");
+
+    for (const typed of ["0", "-3", "", "1e3", "7.5"]) {
+      ui.openSettingsModal();
+      document.querySelector("#ytts-retention-days").value = typed;
+      document.querySelector("#ytts-save-settings").click();
+
+      expect(localStorage.getItem("ytts_retention_days")).toBe("7");
+    }
+  });
+
+  it("keeps the modal open and saves nothing when the window is invalid", () => {
+    localStorage.setItem("ytts_start_minimized", "true");
+
+    ui.openSettingsModal();
+    document.querySelector("#start-minimized").checked = false;
+    document.querySelector("#ytts-retention-days").value = "0";
+    document.querySelector("#ytts-save-settings").click();
+
+    expect(document.querySelector("#ytts-settings-modal")).not.toBeNull();
+    expect(localStorage.getItem("ytts_start_minimized")).toBe("true");
+    expect(notification.showNotification).toHaveBeenCalledWith(
+      expect.stringContaining("Expiration window"),
+      2000,
+    );
+  });
+
+  it("cleans with the window just saved when auto cleanup is on", () => {
+    let windowAtCleanup = null;
+    vi.spyOn(handlers, "cleanExpired").mockImplementation(() => {
+      windowAtCleanup = ui.getRetentionDaysSetting();
+    });
+
+    ui.openSettingsModal();
+    document.querySelector("#auto-cleanup-expired").checked = true;
+    document.querySelector("#ytts-retention-days").value = "7";
+    document.querySelector("#ytts-save-settings").click();
+
+    expect(windowAtCleanup).toBe(7);
   });
 
   it("persists the hotkey held by the capture field on save", () => {
@@ -632,7 +712,9 @@ describe("settings", () => {
   });
 
   it("sweeps expired timestamps as soon as auto cleanup is switched on", () => {
-    const clean = vi.spyOn(handlers, "cleanExpired").mockImplementation(() => {});
+    const clean = vi
+      .spyOn(handlers, "cleanExpired")
+      .mockImplementation(() => {});
     ui.openSettingsModal();
     document.querySelector("#auto-cleanup-expired").checked = true;
 
@@ -641,7 +723,9 @@ describe("settings", () => {
   });
 
   it("does not sweep when auto cleanup stays off", () => {
-    const clean = vi.spyOn(handlers, "cleanExpired").mockImplementation(() => {});
+    const clean = vi
+      .spyOn(handlers, "cleanExpired")
+      .mockImplementation(() => {});
     ui.openSettingsModal();
 
     document.querySelector("#ytts-save-settings").click();
@@ -658,7 +742,9 @@ describe("settings modal tabs", () => {
 
     expect(settingsTab.classList.contains("ytts-tab-active")).toBe(true);
     expect(videosTab.classList.contains("ytts-tab-active")).toBe(false);
-    expect(document.querySelector("#ytts-tab-videos").style.display).toBe("none");
+    expect(document.querySelector("#ytts-tab-videos").style.display).toBe(
+      "none",
+    );
     expect(
       document.querySelector("#ytts-tab-settings #auto-cleanup-expired"),
     ).not.toBeNull();
@@ -702,7 +788,12 @@ describe("settings modal tabs", () => {
 
   it("renders the list only once the Videos tab is opened", () => {
     saveTimestamps("vid1", [
-      { time: 10, note: "", creation: "2024-01-01T00:00:00.000Z", expiration: null },
+      {
+        time: 10,
+        note: "",
+        creation: "2024-01-01T00:00:00.000Z",
+        expiration: null,
+      },
     ]);
     const render = vi.spyOn(ui, "renderVideoList");
 
@@ -710,7 +801,9 @@ describe("settings modal tabs", () => {
     expect(render).not.toHaveBeenCalled();
 
     tabButtons()[1].click();
-    expect(render).toHaveBeenCalledWith(document.querySelector("#ytts-tab-videos"));
+    expect(render).toHaveBeenCalledWith(
+      document.querySelector("#ytts-tab-videos"),
+    );
   });
 });
 
@@ -721,7 +814,9 @@ describe("renderVideoList", () => {
     creation,
     expiration: null,
   });
-  const items = (container) => [...container.querySelectorAll(".ytts-video-item")];
+  const items = (container) => [
+    ...container.querySelectorAll(".ytts-video-item"),
+  ];
 
   let container;
 
@@ -759,7 +854,10 @@ describe("renderVideoList", () => {
       stamp("2024-01-01T00:00:00.000Z"),
       stamp("2024-01-02T00:00:00.000Z"),
     ]);
-    localStorage.setItem("yttsmeta_vid1", JSON.stringify({ title: "Meu Vídeo" }));
+    localStorage.setItem(
+      "yttsmeta_vid1",
+      JSON.stringify({ title: "Meu Vídeo" }),
+    );
 
     ui.renderVideoList(container);
     const [li] = items(container);
