@@ -5,7 +5,13 @@ import { drag } from "./drag.js";
 import { showNotification } from "./utils/notification.js";
 import { progressMarkers } from "./progressMarkers.js";
 import { handlers } from "./handlers.js";
-import { getAllSavedVideos, getRetentionDays } from "./utils/storage.js";
+import {
+  getAllSavedVideos,
+  getRetentionDays,
+  getMarkerShape,
+  getMarkerColor,
+  MARKER_SHAPES,
+} from "./utils/storage.js";
 import { getVideoId } from "./utils/video.js";
 import {
   DEFAULT_HOTKEY,
@@ -277,7 +283,8 @@ const STYLES = `
     cursor: pointer;
   }
   .ytts-hotkey-row,
-  .ytts-retention-row {
+  .ytts-retention-row,
+  .ytts-marker-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -286,7 +293,8 @@ const STYLES = `
     font-size: 14px;
   }
   #ytts-hotkey-field,
-  #ytts-retention-days {
+  #ytts-retention-days,
+  #ytts-marker-shape {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -302,6 +310,25 @@ const STYLES = `
   }
   #ytts-retention-days {
     width: 60px;
+  }
+  #ytts-marker-shape {
+    flex: 1;
+    cursor: pointer;
+  }
+  /* O menu do <select> é desenhado pelo navegador, fora do CSS do painel: sem
+     esta regra as opções sairiam com texto branco sobre fundo branco. */
+  #ytts-marker-shape option {
+    background: #1c1c1c;
+    color: white;
+  }
+  #ytts-marker-color {
+    width: 44px;
+    height: 30px;
+    padding: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
   }
   #ytts-hotkey-field.capturing {
     border-color: #4FC3F7;
@@ -863,6 +890,26 @@ export const ui = {
         }),
         el("span", { textContent: "days" }),
       ]),
+      el("div", { className: "ytts-marker-row" }, [
+        el("span", { textContent: "Marker style" }),
+        el(
+          "select",
+          { id: "ytts-marker-shape" },
+          Object.entries(MARKER_SHAPES).map(([shape, { label }]) =>
+            el("option", {
+              value: shape,
+              textContent: label,
+              selected: shape === ui.getMarkerShapeSetting(),
+            }),
+          ),
+        ),
+        el("input", {
+          type: "color",
+          id: "ytts-marker-color",
+          title: "Marker colour",
+          value: ui.getMarkerColorSetting(),
+        }),
+      ]),
       el(
         "label",
         { className: "ytts-setting-item", style: { marginTop: "12px" } },
@@ -1089,6 +1136,22 @@ export const ui = {
   },
 
   /**
+   * Lê a forma configurada para o marcador na barra de progresso.
+   * @returns {string} Chave de `MARKER_SHAPES`.
+   */
+  getMarkerShapeSetting() {
+    return getMarkerShape();
+  },
+
+  /**
+   * Lê a cor configurada para o marcador na barra de progresso.
+   * @returns {string} Cor no formato `#rrggbb`.
+   */
+  getMarkerColorSetting() {
+    return getMarkerColor();
+  },
+
+  /**
    * Lê o atalho de teclado configurado para criar timestamp.
    * Chave ausente devolve o atalho de fábrica; `null` gravado significa atalho
    * desligado pelo usuário; valor corrompido cai no padrão.
@@ -1139,6 +1202,12 @@ export const ui = {
       ? Number(retentionRaw)
       : NaN;
 
+    // Forma e cor não têm validação a fazer como o prazo tem: o `<select>` só
+    // devolve uma das opções que ele mesmo montou e o `type="color"` só
+    // devolve `#rrggbb`. Os getters já caem no padrão se algo escapar.
+    const shapeField = document.querySelector("#ytts-marker-shape");
+    const colorField = document.querySelector("#ytts-marker-color");
+
     // Prazo inválido cancela o Save inteiro e mantém o modal aberto: descartar
     // só esse campo e ainda anunciar "Settings saved!" deixaria o usuário
     // achando que gravou um prazo que continua sendo o antigo.
@@ -1165,6 +1234,12 @@ export const ui = {
       if (retentionField) {
         localStorage.setItem("ytts_retention_days", retentionDays.toString());
       }
+      if (shapeField) {
+        localStorage.setItem("ytts_marker_shape", shapeField.value);
+      }
+      if (colorField) {
+        localStorage.setItem("ytts_marker_color", colorField.value);
+      }
 
       if (autoCleanup) {
         handlers.cleanExpired();
@@ -1176,5 +1251,15 @@ export const ui = {
     }
 
     document.querySelector("#ytts-settings-modal").remove();
+
+    // Redesenha na hora: sem isso o marcador só mudaria de cara na próxima
+    // navegação, e o usuário não veria o efeito do que acabou de escolher.
+    //
+    // Fora do `try` de propósito: falhar ao desenhar não é falhar ao gravar.
+    // Dentro dele, um erro daqui anunciaria "Failed to save settings" com tudo
+    // já persistido, e o usuário reabriria o modal atrás de um dado que nunca
+    // se perdeu. Depois do `remove()` pelo mesmo motivo: o modal fecha mesmo se
+    // o desenho quebrar.
+    progressMarkers.updateMarkers();
   },
 };

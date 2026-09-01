@@ -1,9 +1,16 @@
 import { getVideo } from "./utils/video.js";
 import { formatTime } from "./utils/time.js";
+import { hexToRgba } from "./utils/color.js";
+import {
+  MARKER_SHAPES,
+  getMarkerShape,
+  getMarkerColor,
+} from "./utils/storage.js";
 
 export const progressMarkers = {
   markersContainer: null,
   _lastKey: null,
+  _retryId: null,
 
   /**
    * Inicializa os marcadores de progresso: cria o container e renderiza os pins.
@@ -26,7 +33,21 @@ export const progressMarkers = {
       ".ytp-progress-bar-container, .ytp-progress-bar",
     );
     if (!progressBar) {
-      setTimeout(() => this.createMarkersContainer(), 1000);
+      // Retenta por `init()`, e não só por `createMarkersContainer()`: quando a
+      // barra finalmente aparece, o container sozinho ficaria vazio até a
+      // próxima mudança na lista, porque ninguém chamaria `updateMarkers`.
+      //
+      // Uma retentativa por vez: `init()` chama esta função e logo depois
+      // `updateMarkers`, que também tenta montar o container quando falta. Sem
+      // a guarda, cada rodada agendaria um timer novo, e o segundo a disparar
+      // recriaria um container já montado — vazio, porque `_lastKey` bloqueia
+      // o redesenho de uma lista que não mudou.
+      if (this._retryId === null) {
+        this._retryId = setTimeout(() => {
+          this._retryId = null;
+          this.init();
+        }, 1000);
+      }
       return;
     }
 
@@ -52,15 +73,33 @@ export const progressMarkers = {
    */
   updateMarkers() {
     if (!this.markersContainer) {
-      this.init();
-      return;
+      // `createMarkersContainer()` e não `init()`: `init()` chama
+      // `updateMarkers` de volta, e enquanto a barra de progresso não estivesse
+      // no DOM os dois se chamariam até estourar a pilha
+      // (`RangeError: Maximum call stack size exceeded`), com um `setTimeout`
+      // de retentativa agendado por nível.
+      this.createMarkersContainer();
+      // Barra ainda ausente: desiste desta rodada e deixa a retentativa
+      // agendada acima refazer o caminho inteiro por `init()`.
+      if (!this.markersContainer) return;
     }
 
     const video = getVideo();
     if (!video || !video.duration) return;
 
+    // Lidos uma vez, fora do laço: são preferências globais, e reler a cada
+    // item deixaria marcadores da mesma renderização em estados diferentes se
+    // a configuração mudasse no meio.
+    const shape = getMarkerShape();
+    const color = getMarkerColor();
+    const glyph = MARKER_SHAPES[shape].glyph;
+    const glow = hexToRgba(color, 0.6);
+    const glowHover = hexToRgba(color, 0.8);
+
     const timestamps = this.getCurrentTimestamps();
-    const key = JSON.stringify(timestamps);
+    // Forma e cor entram na chave junto dos timestamps: sem elas, salvar a
+    // configuração não mudaria nada na tela enquanto a lista não mexesse.
+    const key = JSON.stringify({ timestamps, shape, color });
     if (key === this._lastKey) return;
     this._lastKey = key;
 
@@ -88,18 +127,39 @@ export const progressMarkers = {
       `;
 
       marker.className = "ytts-marker";
-      marker.style.cssText = `
+      // A barra é uma caixa pintada com `background-color`; as outras formas
+      // são um caractere pintado com `color`. Daí o brilho trocar de
+      // `box-shadow` por `text-shadow`: sombra de caixa num nó de texto sem
+      // fundo desenharia um retângulo em volta do glifo, não o contorno dele.
+      //
+      // `background-color` e não o atalho `background`: o parser de CSS do
+      // jsdom engole o resto do bloco depois do atalho, e aí nenhum estilo do
+      // marcador chega ao teste.
+      marker.style.cssText = glyph
+        ? `
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: ${color};
+        font-size: 14px;
+        line-height: 1;
+        text-shadow: 0 0 4px ${glow};
+        transition: all 0.2s ease;
+      `
+        : `
         position: absolute;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
         width: 3px;
         height: 12px;
-        background: #ff6b6b;
+        background-color: ${color};
         border-radius: 2px;
-        box-shadow: 0 0 4px rgba(255, 107, 107, 0.6);
+        box-shadow: 0 0 4px ${glow};
         transition: all 0.2s ease;
       `;
+      if (glyph) marker.textContent = glyph;
 
       const tooltipText = `${formatTime(timestamp.time)}${
         timestamp.note ? ` - ${timestamp.note}` : ""
@@ -145,22 +205,37 @@ export const progressMarkers = {
 
       tooltip.appendChild(tooltipArrow);
 
+      // O hover deixa de trocar de cor (`#ff6b6b` → `#ff5252`) e passa a
+      // clarear a cor escolhida: com cor livre não existe um segundo tom fixo
+      // que sirva para qualquer hex.
       markerWrapper.addEventListener("mouseenter", () => {
         tooltip.style.opacity = "1";
         tooltip.style.visibility = "visible";
-        marker.style.height = "16px";
-        marker.style.width = "4px";
-        marker.style.background = "#ff5252";
-        marker.style.boxShadow = "0 0 8px rgba(255, 82, 82, 0.8)";
+        marker.style.filter = "brightness(1.2)";
+        if (glyph) {
+          // O `translate` continua na regra porque é ele que centraliza o
+          // marcador; sozinho, o `scale` jogaria o glifo para fora do lugar.
+          marker.style.transform = "translate(-50%, -50%) scale(1.25)";
+          marker.style.textShadow = `0 0 8px ${glowHover}`;
+        } else {
+          marker.style.height = "16px";
+          marker.style.width = "4px";
+          marker.style.boxShadow = `0 0 8px ${glowHover}`;
+        }
       });
 
       markerWrapper.addEventListener("mouseleave", () => {
         tooltip.style.opacity = "0";
         tooltip.style.visibility = "hidden";
-        marker.style.height = "12px";
-        marker.style.width = "3px";
-        marker.style.background = "#ff6b6b";
-        marker.style.boxShadow = "0 0 4px rgba(255, 107, 107, 0.6)";
+        marker.style.filter = "";
+        if (glyph) {
+          marker.style.transform = "translate(-50%, -50%)";
+          marker.style.textShadow = `0 0 4px ${glow}`;
+        } else {
+          marker.style.height = "12px";
+          marker.style.width = "3px";
+          marker.style.boxShadow = `0 0 4px ${glow}`;
+        }
       });
 
       markerWrapper.addEventListener("click", (e) => {
@@ -206,6 +281,13 @@ export const progressMarkers = {
    * Remove o container de marcadores do DOM e limpa a referência interna.
    */
   destroy() {
+    // Retentativa pendente cancelada junto: deixada viva, ela remontaria os
+    // marcadores depois da navegação já ter saído da página de vídeo.
+    if (this._retryId !== null) {
+      clearTimeout(this._retryId);
+      this._retryId = null;
+    }
+
     if (this.markersContainer) {
       this.markersContainer.remove();
       this.markersContainer = null;

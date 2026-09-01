@@ -15,7 +15,8 @@
 - 📋 **Copy complete list** of all timestamps
 - ⛔ **Delete unwanted timestamps** one by one
 - ☑️ **Bulk delete** - select multiple timestamps and remove them in one go
-- 📍 **Progress bar markers** - every timestamp gets a clickable pin on the video scrubber
+- 📍 **Progress bar markers** - every timestamp gets a clickable pin on the
+  video scrubber, in the shape (bar, ★, ▼ or ✕) and colour you pick
 - 💾 **Automatic saving** - timestamps persist per video and expire after a
   window you choose (30 days by default)
 - ⠿ **Drag the panel anywhere** - grab the handle and drop it where it suits you; the spot is remembered
@@ -113,11 +114,17 @@ panel header to open the settings:
 | ------------------------------------------ | ------- | -------------------------------------------------------- |
 | **Automatically clean expired timestamps** | Off     | Drops expired timestamps when a video loads              |
 | **Expire timestamps after**                | 30 days | How long a timestamp is kept, counted from its creation  |
+| **Marker style**                           | ▮ Bar   | Shape and colour of the pins on the progress bar         |
 | **Start widget minimized**                 | On      | Opens the panel collapsed, showing only the header       |
 | **Timestamp shortcut**                     | Shift+S | Keyboard shortcut that adds a timestamp                  |
 
 The retention window applies to every timestamp, old ones included: lowering it
 makes older timestamps expire right away.
+
+**Marker style** picks how the pins look on the progress bar: the bar (`▮`, the
+default), a star (`★`), an arrow (`▼`) or a cross (`✕`), in any colour the
+colour picker next to it offers. The choice is global and applies right after
+you save.
 
 To change the shortcut, click the field and press the combination you want; the
 **Clear** button next to it turns the shortcut off. The shortcut is ignored while

@@ -50,6 +50,37 @@ describe("createMarkersContainer", () => {
     progressMarkers.createMarkersContainer();
     expect(bar.querySelectorAll(".ytts-progress-markers")).toHaveLength(1);
   });
+
+  it("draws the pins on the retry that finally finds the progress bar", () => {
+    vi.useFakeTimers();
+    stubVideo({ duration: 200 });
+    ui.createTimestampItem(50);
+
+    progressMarkers.init();
+    expect(progressMarkers.markersContainer).toBeNull();
+
+    createProgressBar();
+    vi.advanceTimersByTime(1000);
+    expect(markers()).toHaveLength(1);
+  });
+});
+
+describe("updateMarkers without a container", () => {
+  it("gives up instead of recursing into init", () => {
+    vi.useFakeTimers();
+    stubVideo({ duration: 200 });
+    ui.createTimestampItem(50);
+    progressMarkers.destroy();
+
+    // Sem esta guarda, `updateMarkers` chamaria `init()`, que chamaria
+    // `updateMarkers` de volta enquanto a barra de progresso não existisse:
+    // `RangeError: Maximum call stack size exceeded`, mais um `setTimeout`
+    // de retentativa por nível da recursão.
+    expect(() => progressMarkers.updateMarkers()).not.toThrow();
+    expect(progressMarkers.markersContainer).toBeNull();
+    // Uma retentativa agendada, não uma por nível de recursão.
+    expect(vi.getTimerCount()).toBe(1);
+  });
 });
 
 describe("getCurrentTimestamps", () => {
@@ -169,6 +200,118 @@ describe("updateMarkers", () => {
     wrapper.dispatchEvent(new MouseEvent("mouseleave"));
     expect(tooltip.style.visibility).toBe("hidden");
     expect(tooltip.style.opacity).toBe("0");
+  });
+});
+
+describe("marker shape and colour", () => {
+  const marker = () => document.querySelector(".ytts-marker");
+
+  beforeEach(() => {
+    createProgressBar();
+    stubVideo({ duration: 200 });
+    progressMarkers.createMarkersContainer();
+    ui.createTimestampItem(50);
+  });
+
+  it("draws the red bar when nothing is configured", () => {
+    progressMarkers.updateMarkers();
+
+    expect(marker().textContent).toBe("");
+    expect(marker().style.width).toBe("3px");
+    expect(marker().style.height).toBe("12px");
+    expect(marker().style.backgroundColor).toBe("rgb(255, 107, 107)");
+    expect(marker().style.boxShadow).toBe("0 0 4px rgba(255, 107, 107, 0.6)");
+  });
+
+  it("draws the configured glyph in the configured colour", () => {
+    localStorage.setItem("ytts_marker_shape", "star");
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    progressMarkers.updateMarkers();
+
+    expect(marker().textContent).toBe("★");
+    expect(marker().style.color).toBe("rgb(0, 255, 0)");
+    expect(marker().style.textShadow).toBe("0 0 4px rgba(0, 255, 0, 0.6)");
+    expect(marker().style.backgroundColor).toBe("");
+  });
+
+  it("draws the bar in the configured colour", () => {
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    progressMarkers.updateMarkers();
+
+    expect(marker().textContent).toBe("");
+    expect(marker().style.backgroundColor).toBe("rgb(0, 255, 0)");
+    expect(marker().style.boxShadow).toBe("0 0 4px rgba(0, 255, 0, 0.6)");
+  });
+
+  it("grows the bar on hover and restores the configured colour on leave", () => {
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    progressMarkers.updateMarkers();
+    const wrapper = markers()[0];
+
+    wrapper.dispatchEvent(new MouseEvent("mouseenter"));
+    expect(marker().style.width).toBe("4px");
+    expect(marker().style.height).toBe("16px");
+    expect(marker().style.filter).toBe("brightness(1.2)");
+    expect(marker().style.boxShadow).toBe("0 0 8px rgba(0, 255, 0, 0.8)");
+
+    wrapper.dispatchEvent(new MouseEvent("mouseleave"));
+    expect(marker().style.width).toBe("3px");
+    expect(marker().style.height).toBe("12px");
+    expect(marker().style.filter).toBe("");
+    expect(marker().style.backgroundColor).toBe("rgb(0, 255, 0)");
+    expect(marker().style.boxShadow).toBe("0 0 4px rgba(0, 255, 0, 0.6)");
+  });
+
+  it("scales the glyph on hover without losing its centring", () => {
+    localStorage.setItem("ytts_marker_shape", "arrow");
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    progressMarkers.updateMarkers();
+    const wrapper = markers()[0];
+
+    expect(marker().textContent).toBe("▼");
+
+    wrapper.dispatchEvent(new MouseEvent("mouseenter"));
+    expect(marker().style.transform).toBe("translate(-50%, -50%) scale(1.25)");
+    expect(marker().style.filter).toBe("brightness(1.2)");
+    expect(marker().style.textShadow).toBe("0 0 8px rgba(0, 255, 0, 0.8)");
+
+    wrapper.dispatchEvent(new MouseEvent("mouseleave"));
+    expect(marker().style.transform).toBe("translate(-50%, -50%)");
+    expect(marker().style.filter).toBe("");
+    expect(marker().style.color).toBe("rgb(0, 255, 0)");
+    expect(marker().style.textShadow).toBe("0 0 4px rgba(0, 255, 0, 0.6)");
+  });
+
+  it("draws the cross glyph", () => {
+    localStorage.setItem("ytts_marker_shape", "cross");
+    progressMarkers.updateMarkers();
+    expect(marker().textContent).toBe("✕");
+  });
+
+  it("redraws when only the colour changed", () => {
+    progressMarkers.updateMarkers();
+    expect(marker().style.backgroundColor).toBe("rgb(255, 107, 107)");
+
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    progressMarkers.updateMarkers();
+    expect(marker().style.backgroundColor).toBe("rgb(0, 255, 0)");
+  });
+
+  it("redraws when only the shape changed", () => {
+    progressMarkers.updateMarkers();
+    expect(marker().textContent).toBe("");
+
+    localStorage.setItem("ytts_marker_shape", "star");
+    progressMarkers.updateMarkers();
+    expect(marker().textContent).toBe("★");
+  });
+
+  it("falls back to the bar for a corrupted shape", () => {
+    localStorage.setItem("ytts_marker_shape", "triangle");
+    progressMarkers.updateMarkers();
+
+    expect(marker().textContent).toBe("");
+    expect(marker().style.backgroundColor).toBe("rgb(255, 107, 107)");
   });
 });
 

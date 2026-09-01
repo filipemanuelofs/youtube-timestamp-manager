@@ -6,6 +6,9 @@ import {
   deleteVideoTimestamps,
   removeExpiredFromStorage,
   getRetentionDays,
+  getMarkerShape,
+  getMarkerColor,
+  MARKER_SHAPES,
   saveVideoTitle,
   loadVideoTitle,
   deleteVideoTitle,
@@ -178,6 +181,85 @@ describe("getRetentionDays", () => {
       throw new DOMException("SecurityError");
     });
     expect(getRetentionDays()).toBe(30);
+    vi.restoreAllMocks();
+  });
+});
+
+describe("getMarkerShape", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to the bar when the key is absent", () => {
+    expect(getMarkerShape()).toBe("bar");
+  });
+
+  it("reads every shape it offers", () => {
+    Object.keys(MARKER_SHAPES).forEach((shape) => {
+      localStorage.setItem("ytts_marker_shape", shape);
+      expect(getMarkerShape()).toBe(shape);
+    });
+  });
+
+  it("falls back to the bar for an unknown shape", () => {
+    localStorage.setItem("ytts_marker_shape", "triangle");
+    expect(getMarkerShape()).toBe("bar");
+  });
+
+  it("falls back to the bar for an empty value", () => {
+    localStorage.setItem("ytts_marker_shape", "");
+    expect(getMarkerShape()).toBe("bar");
+  });
+
+  it("falls back to the bar for an inherited property name", () => {
+    localStorage.setItem("ytts_marker_shape", "toString");
+    expect(getMarkerShape()).toBe("bar");
+  });
+
+  it("falls back to the bar when localStorage is unreachable", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("SecurityError");
+    });
+    expect(getMarkerShape()).toBe("bar");
+    vi.restoreAllMocks();
+  });
+});
+
+describe("getMarkerColor", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to the current red when the key is absent", () => {
+    expect(getMarkerColor()).toBe("#ff6b6b");
+  });
+
+  it("reads the stored colour", () => {
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    expect(getMarkerColor()).toBe("#00ff00");
+  });
+
+  it("accepts uppercase hex digits", () => {
+    localStorage.setItem("ytts_marker_color", "#00FF00");
+    expect(getMarkerColor()).toBe("#00FF00");
+  });
+
+  it("falls back to the default for a colour name", () => {
+    localStorage.setItem("ytts_marker_color", "vermelho");
+    expect(getMarkerColor()).toBe("#ff6b6b");
+  });
+
+  it("falls back to the default for a 3-digit hex", () => {
+    localStorage.setItem("ytts_marker_color", "#fff");
+    expect(getMarkerColor()).toBe("#ff6b6b");
+  });
+
+  it("falls back to the default for an empty value", () => {
+    localStorage.setItem("ytts_marker_color", "");
+    expect(getMarkerColor()).toBe("#ff6b6b");
+  });
+
+  it("falls back to the default when localStorage is unreachable", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("SecurityError");
+    });
+    expect(getMarkerColor()).toBe("#ff6b6b");
     vi.restoreAllMocks();
   });
 });

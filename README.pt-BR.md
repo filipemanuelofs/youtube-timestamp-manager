@@ -15,7 +15,9 @@
 - 📋 **Copiar a lista inteira** de timestamps
 - ⛔ **Apagar timestamps** um a um
 - ☑️ **Apagar em lote** - marque vários timestamps e remova todos de uma vez
-- 📍 **Marcadores na barra de progresso** - cada timestamp vira um pino clicável no scrubber do vídeo
+- 📍 **Marcadores na barra de progresso** - cada timestamp vira um pino
+  clicável no scrubber do vídeo, na forma (barra, ★, ▼ ou ✕) e na cor que você
+  escolher
 - 💾 **Salvamento automático** - os timestamps ficam guardados por vídeo e
   expiram no prazo que você escolher (30 dias por padrão)
 - ⠿ **Arrastar o painel** - pegue pela alça e solte onde quiser; o lugar fica guardado
@@ -113,11 +115,17 @@ cabeçalho do painel para abrir as configurações:
 | ------------------------------------------ | --------- | --------------------------------------------------------------- |
 | **Automatically clean expired timestamps** | Desligado | Descarta os timestamps expirados quando o vídeo carrega          |
 | **Expire timestamps after**                | 30 dias   | Por quanto tempo um timestamp é guardado, contado da criação     |
+| **Marker style**                           | ▮ Bar     | Forma e cor dos pinos na barra de progresso                      |
 | **Start widget minimized**                 | Ligado    | Abre o painel recolhido, mostrando só o cabeçalho               |
 | **Timestamp shortcut**                     | Shift+S   | Atalho de teclado que adiciona um timestamp                     |
 
 O prazo vale para todos os timestamps, inclusive os antigos: diminuí-lo faz os
 mais velhos expirarem na hora.
+
+O **Marker style** escolhe a cara dos pinos na barra de progresso: a barra
+(`▮`, o padrão), uma estrela (`★`), uma seta (`▼`) ou um xis (`✕`), em qualquer
+cor que o seletor ao lado oferecer. A escolha é global e vale assim que você
+salva.
 
 Para trocar o atalho, clique no campo e aperte a combinação desejada; o botão
 **Clear** ao lado desliga o atalho. O atalho é ignorado enquanto você digita —

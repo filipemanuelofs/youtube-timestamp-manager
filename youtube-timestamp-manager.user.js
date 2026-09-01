@@ -385,15 +385,188 @@
     }
   });
 
+  // src/utils/color.js
+  function hexToRgba(hex, alpha) {
+    const match = typeof hex === "string" ? hex.match(HEX_RE) : null;
+    const digits = match ? match[1] : FALLBACK_HEX.slice(1);
+    const r = parseInt(digits.slice(0, 2), 16);
+    const g = parseInt(digits.slice(2, 4), 16);
+    const b = parseInt(digits.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  var FALLBACK_HEX, HEX_RE;
+  var init_color = __esm({
+    "src/utils/color.js"() {
+      FALLBACK_HEX = "#ff6b6b";
+      HEX_RE = /^#([0-9a-f]{6})$/i;
+    }
+  });
+
+  // src/utils/storage.js
+  function saveTimestamps(videoId, timestamps) {
+    try {
+      localStorage.setItem(`${PREFIX}${videoId}`, JSON.stringify(timestamps));
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to save timestamps:", error);
+    }
+  }
+  function loadTimestamps(videoId) {
+    try {
+      const data = localStorage.getItem(`${PREFIX}${videoId}`);
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to load timestamps:", error);
+      return [];
+    }
+  }
+  function saveVideoTitle(videoId, title) {
+    if (!title) return;
+    try {
+      localStorage.setItem(`${META_PREFIX}${videoId}`, JSON.stringify({ title }));
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to save video title:", error);
+    }
+  }
+  function loadVideoTitle(videoId) {
+    try {
+      const data = localStorage.getItem(`${META_PREFIX}${videoId}`);
+      if (!data) return "";
+      const parsed = JSON.parse(data);
+      return parsed && typeof parsed.title === "string" ? parsed.title : "";
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to load video title:", error);
+      return "";
+    }
+  }
+  function deleteVideoTitle(videoId) {
+    try {
+      localStorage.removeItem(`${META_PREFIX}${videoId}`);
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to delete video title:", error);
+    }
+  }
+  function getAllSavedVideos() {
+    const videos = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(PREFIX)) {
+          const videoId = key.replace(PREFIX, "");
+          const timestamps = loadTimestamps(videoId);
+          if (timestamps.length > 0) {
+            videos.push({ videoId, title: loadVideoTitle(videoId), timestamps });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to get saved videos:", error);
+    }
+    return videos;
+  }
+  function deleteVideoTimestamps(videoId) {
+    try {
+      localStorage.removeItem(`${PREFIX}${videoId}`);
+    } catch (error) {
+      console.error("[YT Timestamp Manager] Failed to delete timestamps:", error);
+    }
+    deleteVideoTitle(videoId);
+  }
+  function getRetentionDays() {
+    try {
+      const days = parseInt(localStorage.getItem("ytts_retention_days"), 10);
+      return Number.isNaN(days) || days < 1 ? DEFAULT_RETENTION_DAYS : days;
+    } catch {
+      return DEFAULT_RETENTION_DAYS;
+    }
+  }
+  function getMarkerShape() {
+    try {
+      const shape = localStorage.getItem("ytts_marker_shape");
+      return Object.hasOwn(MARKER_SHAPES, shape ?? "") ? shape : DEFAULT_MARKER_SHAPE;
+    } catch {
+      return DEFAULT_MARKER_SHAPE;
+    }
+  }
+  function getMarkerColor() {
+    try {
+      const color = localStorage.getItem("ytts_marker_color");
+      return HEX_COLOR_RE.test(color ?? "") ? color : DEFAULT_MARKER_COLOR;
+    } catch {
+      return DEFAULT_MARKER_COLOR;
+    }
+  }
+  function removeExpiredFromStorage() {
+    const cutoff = Date.now() - getRetentionDays() * 24 * 60 * 60 * 1e3;
+    let cleanedCount = 0;
+    const affectedVideoIds = [];
+    const emptiedVideoIds = [];
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(PREFIX)) {
+          const data = localStorage.getItem(key);
+          if (data) {
+            const timestamps = JSON.parse(data);
+            if (!Array.isArray(timestamps)) continue;
+            const valid = timestamps.filter((ts) => {
+              const created = Date.parse(ts.creation);
+              return Number.isNaN(created) || created >= cutoff;
+            });
+            if (valid.length !== timestamps.length) {
+              const videoId = key.replace(PREFIX, "");
+              cleanedCount += timestamps.length - valid.length;
+              affectedVideoIds.push(videoId);
+              if (valid.length > 0) {
+                localStorage.setItem(key, JSON.stringify(valid));
+              } else {
+                localStorage.removeItem(key);
+                emptiedVideoIds.push(videoId);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(
+        "[YT Timestamp Manager] Failed to clean expired timestamps:",
+        error
+      );
+    }
+    emptiedVideoIds.forEach((videoId) => deleteVideoTitle(videoId));
+    return { cleanedCount, affectedVideoIds };
+  }
+  var PREFIX, META_PREFIX, DEFAULT_RETENTION_DAYS, MARKER_SHAPES, DEFAULT_MARKER_SHAPE, DEFAULT_MARKER_COLOR, HEX_COLOR_RE;
+  var init_storage = __esm({
+    "src/utils/storage.js"() {
+      PREFIX = "ytts_";
+      META_PREFIX = "yttsmeta_";
+      DEFAULT_RETENTION_DAYS = 30;
+      MARKER_SHAPES = {
+        bar: { label: "\u25AE Bar", glyph: "" },
+        star: { label: "\u2605 Star", glyph: "\u2605" },
+        arrow: { label: "\u25BC Arrow", glyph: "\u25BC" },
+        cross: { label: "\u2715 Cross", glyph: "\u2715" }
+      };
+      DEFAULT_MARKER_SHAPE = "bar";
+      DEFAULT_MARKER_COLOR = "#ff6b6b";
+      HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+    }
+  });
+
   // src/progressMarkers.js
   var progressMarkers;
   var init_progressMarkers = __esm({
     "src/progressMarkers.js"() {
       init_video();
       init_time();
+      init_color();
+      init_storage();
       progressMarkers = {
         markersContainer: null,
         _lastKey: null,
+        _retryId: null,
         /**
          * Inicializa os marcadores de progresso: cria o container e renderiza os pins.
          */
@@ -413,7 +586,12 @@
             ".ytp-progress-bar-container, .ytp-progress-bar"
           );
           if (!progressBar) {
-            setTimeout(() => this.createMarkersContainer(), 1e3);
+            if (this._retryId === null) {
+              this._retryId = setTimeout(() => {
+                this._retryId = null;
+                this.init();
+              }, 1e3);
+            }
             return;
           }
           this.markersContainer = document.createElement("div");
@@ -436,13 +614,18 @@
          */
         updateMarkers() {
           if (!this.markersContainer) {
-            this.init();
-            return;
+            this.createMarkersContainer();
+            if (!this.markersContainer) return;
           }
           const video = getVideo();
           if (!video || !video.duration) return;
+          const shape = getMarkerShape();
+          const color = getMarkerColor();
+          const glyph = MARKER_SHAPES[shape].glyph;
+          const glow = hexToRgba(color, 0.6);
+          const glowHover = hexToRgba(color, 0.8);
           const timestamps = this.getCurrentTimestamps();
-          const key = JSON.stringify(timestamps);
+          const key = JSON.stringify({ timestamps, shape, color });
           if (key === this._lastKey) return;
           this._lastKey = key;
           this.markersContainer.replaceChildren();
@@ -464,18 +647,29 @@
         cursor: pointer;
       `;
             marker.className = "ytts-marker";
-            marker.style.cssText = `
+            marker.style.cssText = glyph ? `
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: ${color};
+        font-size: 14px;
+        line-height: 1;
+        text-shadow: 0 0 4px ${glow};
+        transition: all 0.2s ease;
+      ` : `
         position: absolute;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
         width: 3px;
         height: 12px;
-        background: #ff6b6b;
+        background-color: ${color};
         border-radius: 2px;
-        box-shadow: 0 0 4px rgba(255, 107, 107, 0.6);
+        box-shadow: 0 0 4px ${glow};
         transition: all 0.2s ease;
       `;
+            if (glyph) marker.textContent = glyph;
             const tooltipText = `${formatTime(timestamp.time)}${timestamp.note ? ` - ${timestamp.note}` : ""}`;
             tooltip.className = "ytts-marker-tooltip";
             tooltip.textContent = tooltipText;
@@ -518,18 +712,28 @@
             markerWrapper.addEventListener("mouseenter", () => {
               tooltip.style.opacity = "1";
               tooltip.style.visibility = "visible";
-              marker.style.height = "16px";
-              marker.style.width = "4px";
-              marker.style.background = "#ff5252";
-              marker.style.boxShadow = "0 0 8px rgba(255, 82, 82, 0.8)";
+              marker.style.filter = "brightness(1.2)";
+              if (glyph) {
+                marker.style.transform = "translate(-50%, -50%) scale(1.25)";
+                marker.style.textShadow = `0 0 8px ${glowHover}`;
+              } else {
+                marker.style.height = "16px";
+                marker.style.width = "4px";
+                marker.style.boxShadow = `0 0 8px ${glowHover}`;
+              }
             });
             markerWrapper.addEventListener("mouseleave", () => {
               tooltip.style.opacity = "0";
               tooltip.style.visibility = "hidden";
-              marker.style.height = "12px";
-              marker.style.width = "3px";
-              marker.style.background = "#ff6b6b";
-              marker.style.boxShadow = "0 0 4px rgba(255, 107, 107, 0.6)";
+              marker.style.filter = "";
+              if (glyph) {
+                marker.style.transform = "translate(-50%, -50%)";
+                marker.style.textShadow = `0 0 4px ${glow}`;
+              } else {
+                marker.style.height = "12px";
+                marker.style.width = "3px";
+                marker.style.boxShadow = `0 0 4px ${glow}`;
+              }
             });
             markerWrapper.addEventListener("click", (e) => {
               e.stopPropagation();
@@ -568,6 +772,10 @@
          * Remove o container de marcadores do DOM e limpa a referência interna.
          */
         destroy() {
+          if (this._retryId !== null) {
+            clearTimeout(this._retryId);
+            this._retryId = null;
+          }
           if (this.markersContainer) {
             this.markersContainer.remove();
             this.markersContainer = null;
@@ -692,134 +900,6 @@
         shift: true,
         meta: false
       };
-    }
-  });
-
-  // src/utils/storage.js
-  function saveTimestamps(videoId, timestamps) {
-    try {
-      localStorage.setItem(`${PREFIX}${videoId}`, JSON.stringify(timestamps));
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to save timestamps:", error);
-    }
-  }
-  function loadTimestamps(videoId) {
-    try {
-      const data = localStorage.getItem(`${PREFIX}${videoId}`);
-      if (!data) return [];
-      const parsed = JSON.parse(data);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to load timestamps:", error);
-      return [];
-    }
-  }
-  function saveVideoTitle(videoId, title) {
-    if (!title) return;
-    try {
-      localStorage.setItem(`${META_PREFIX}${videoId}`, JSON.stringify({ title }));
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to save video title:", error);
-    }
-  }
-  function loadVideoTitle(videoId) {
-    try {
-      const data = localStorage.getItem(`${META_PREFIX}${videoId}`);
-      if (!data) return "";
-      const parsed = JSON.parse(data);
-      return parsed && typeof parsed.title === "string" ? parsed.title : "";
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to load video title:", error);
-      return "";
-    }
-  }
-  function deleteVideoTitle(videoId) {
-    try {
-      localStorage.removeItem(`${META_PREFIX}${videoId}`);
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to delete video title:", error);
-    }
-  }
-  function getAllSavedVideos() {
-    const videos = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(PREFIX)) {
-          const videoId = key.replace(PREFIX, "");
-          const timestamps = loadTimestamps(videoId);
-          if (timestamps.length > 0) {
-            videos.push({ videoId, title: loadVideoTitle(videoId), timestamps });
-          }
-        }
-      }
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to get saved videos:", error);
-    }
-    return videos;
-  }
-  function deleteVideoTimestamps(videoId) {
-    try {
-      localStorage.removeItem(`${PREFIX}${videoId}`);
-    } catch (error) {
-      console.error("[YT Timestamp Manager] Failed to delete timestamps:", error);
-    }
-    deleteVideoTitle(videoId);
-  }
-  function getRetentionDays() {
-    try {
-      const days = parseInt(localStorage.getItem("ytts_retention_days"), 10);
-      return Number.isNaN(days) || days < 1 ? DEFAULT_RETENTION_DAYS : days;
-    } catch {
-      return DEFAULT_RETENTION_DAYS;
-    }
-  }
-  function removeExpiredFromStorage() {
-    const cutoff = Date.now() - getRetentionDays() * 24 * 60 * 60 * 1e3;
-    let cleanedCount = 0;
-    const affectedVideoIds = [];
-    const emptiedVideoIds = [];
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(PREFIX)) {
-          const data = localStorage.getItem(key);
-          if (data) {
-            const timestamps = JSON.parse(data);
-            if (!Array.isArray(timestamps)) continue;
-            const valid = timestamps.filter((ts) => {
-              const created = Date.parse(ts.creation);
-              return Number.isNaN(created) || created >= cutoff;
-            });
-            if (valid.length !== timestamps.length) {
-              const videoId = key.replace(PREFIX, "");
-              cleanedCount += timestamps.length - valid.length;
-              affectedVideoIds.push(videoId);
-              if (valid.length > 0) {
-                localStorage.setItem(key, JSON.stringify(valid));
-              } else {
-                localStorage.removeItem(key);
-                emptiedVideoIds.push(videoId);
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error(
-        "[YT Timestamp Manager] Failed to clean expired timestamps:",
-        error
-      );
-    }
-    emptiedVideoIds.forEach((videoId) => deleteVideoTitle(videoId));
-    return { cleanedCount, affectedVideoIds };
-  }
-  var PREFIX, META_PREFIX, DEFAULT_RETENTION_DAYS;
-  var init_storage = __esm({
-    "src/utils/storage.js"() {
-      PREFIX = "ytts_";
-      META_PREFIX = "yttsmeta_";
-      DEFAULT_RETENTION_DAYS = 30;
     }
   });
 
@@ -1151,7 +1231,8 @@
     cursor: pointer;
   }
   .ytts-hotkey-row,
-  .ytts-retention-row {
+  .ytts-retention-row,
+  .ytts-marker-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1160,7 +1241,8 @@
     font-size: 14px;
   }
   #ytts-hotkey-field,
-  #ytts-retention-days {
+  #ytts-retention-days,
+  #ytts-marker-shape {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1176,6 +1258,25 @@
   }
   #ytts-retention-days {
     width: 60px;
+  }
+  #ytts-marker-shape {
+    flex: 1;
+    cursor: pointer;
+  }
+  /* O menu do <select> \xE9 desenhado pelo navegador, fora do CSS do painel: sem
+     esta regra as op\xE7\xF5es sairiam com texto branco sobre fundo branco. */
+  #ytts-marker-shape option {
+    background: #1c1c1c;
+    color: white;
+  }
+  #ytts-marker-color {
+    width: 44px;
+    height: 30px;
+    padding: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
   }
   #ytts-hotkey-field.capturing {
     border-color: #4FC3F7;
@@ -1667,6 +1768,26 @@
               }),
               el("span", { textContent: "days" })
             ]),
+            el("div", { className: "ytts-marker-row" }, [
+              el("span", { textContent: "Marker style" }),
+              el(
+                "select",
+                { id: "ytts-marker-shape" },
+                Object.entries(MARKER_SHAPES).map(
+                  ([shape, { label }]) => el("option", {
+                    value: shape,
+                    textContent: label,
+                    selected: shape === ui.getMarkerShapeSetting()
+                  })
+                )
+              ),
+              el("input", {
+                type: "color",
+                id: "ytts-marker-color",
+                title: "Marker colour",
+                value: ui.getMarkerColorSetting()
+              })
+            ]),
             el(
               "label",
               { className: "ytts-setting-item", style: { marginTop: "12px" } },
@@ -1861,6 +1982,20 @@
           return getRetentionDays();
         },
         /**
+         * Lê a forma configurada para o marcador na barra de progresso.
+         * @returns {string} Chave de `MARKER_SHAPES`.
+         */
+        getMarkerShapeSetting() {
+          return getMarkerShape();
+        },
+        /**
+         * Lê a cor configurada para o marcador na barra de progresso.
+         * @returns {string} Cor no formato `#rrggbb`.
+         */
+        getMarkerColorSetting() {
+          return getMarkerColor();
+        },
+        /**
          * Lê o atalho de teclado configurado para criar timestamp.
          * Chave ausente devolve o atalho de fábrica; `null` gravado significa atalho
          * desligado pelo usuário; valor corrompido cai no padrão.
@@ -1900,6 +2035,8 @@
           const retentionField = document.querySelector("#ytts-retention-days");
           const retentionRaw = retentionField ? retentionField.value.trim() : "";
           const retentionDays = /^\d+$/.test(retentionRaw) ? Number(retentionRaw) : NaN;
+          const shapeField = document.querySelector("#ytts-marker-shape");
+          const colorField = document.querySelector("#ytts-marker-color");
           if (retentionField && !(Number.isInteger(retentionDays) && retentionDays >= 1)) {
             showNotification(
               "\u274C Expiration window must be a whole number of days, 1 or more",
@@ -1919,6 +2056,12 @@
             if (retentionField) {
               localStorage.setItem("ytts_retention_days", retentionDays.toString());
             }
+            if (shapeField) {
+              localStorage.setItem("ytts_marker_shape", shapeField.value);
+            }
+            if (colorField) {
+              localStorage.setItem("ytts_marker_color", colorField.value);
+            }
             if (autoCleanup) {
               handlers.cleanExpired();
             }
@@ -1927,6 +2070,7 @@
             showNotification("\u274C Failed to save settings", 1500);
           }
           document.querySelector("#ytts-settings-modal").remove();
+          progressMarkers.updateMarkers();
         }
       };
     }

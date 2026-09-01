@@ -453,6 +453,18 @@ describe("settings", () => {
     expect(ui.getRetentionDaysSetting()).toBe(7);
   });
 
+  it("reads the marker shape, defaulting to the bar", () => {
+    expect(ui.getMarkerShapeSetting()).toBe("bar");
+    localStorage.setItem("ytts_marker_shape", "star");
+    expect(ui.getMarkerShapeSetting()).toBe("star");
+  });
+
+  it("reads the marker colour, defaulting to the current red", () => {
+    expect(ui.getMarkerColorSetting()).toBe("#ff6b6b");
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    expect(ui.getMarkerColorSetting()).toBe("#00ff00");
+  });
+
   it("falls back to the factory hotkey when nothing is stored", () => {
     expect(ui.getHotkeySetting()).toEqual(DEFAULT_HOTKEY);
   });
@@ -490,6 +502,71 @@ describe("settings", () => {
     localStorage.setItem("ytts_retention_days", "7");
     ui.openSettingsModal();
     expect(document.querySelector("#ytts-retention-days").value).toBe("7");
+  });
+
+  it("offers every marker shape, opening on the configured one", () => {
+    ui.openSettingsModal();
+    const shapes = [
+      ...document.querySelectorAll("#ytts-marker-shape option"),
+    ].map((option) => option.value);
+    expect(shapes).toEqual(["bar", "star", "arrow", "cross"]);
+    expect(document.querySelector("#ytts-marker-shape").value).toBe("bar");
+
+    document.querySelector("#ytts-cancel-settings").click();
+    localStorage.setItem("ytts_marker_shape", "arrow");
+    ui.openSettingsModal();
+    expect(document.querySelector("#ytts-marker-shape").value).toBe("arrow");
+  });
+
+  it("opens the colour field on the configured colour", () => {
+    ui.openSettingsModal();
+    expect(document.querySelector("#ytts-marker-color").value).toBe("#ff6b6b");
+
+    document.querySelector("#ytts-cancel-settings").click();
+    localStorage.setItem("ytts_marker_color", "#00ff00");
+    ui.openSettingsModal();
+    expect(document.querySelector("#ytts-marker-color").value).toBe("#00ff00");
+  });
+
+  it("persists the marker shape and colour, redrawing at once", () => {
+    const redraw = vi
+      .spyOn(progressMarkers, "updateMarkers")
+      .mockImplementation(() => {});
+
+    ui.openSettingsModal();
+    document.querySelector("#ytts-marker-shape").value = "star";
+    document.querySelector("#ytts-marker-color").value = "#00ff00";
+    document.querySelector("#ytts-save-settings").click();
+
+    expect(localStorage.getItem("ytts_marker_shape")).toBe("star");
+    expect(localStorage.getItem("ytts_marker_color")).toBe("#00ff00");
+    expect(redraw).toHaveBeenCalled();
+  });
+
+  it("still reports success and closes when the redraw blows up", () => {
+    // O redesenho fica fora do `try` do Save: falhar ao desenhar não é falhar
+    // ao gravar. Dentro dele, um erro aqui anunciaria "Failed to save
+    // settings" com as chaves já no `localStorage`.
+    vi.spyOn(progressMarkers, "updateMarkers").mockImplementation(() => {
+      throw new Error("no progress bar");
+    });
+
+    // Chamado direto, e não pelo clique: o jsdom engole o erro de um listener
+    // e o relata como erro não tratado, o que derrubaria o arquivo de teste
+    // inteiro em vez de virar asserção.
+    ui.openSettingsModal();
+    document.querySelector("#ytts-marker-shape").value = "star";
+    expect(() => ui.saveSettings()).toThrow("no progress bar");
+
+    expect(localStorage.getItem("ytts_marker_shape")).toBe("star");
+    expect(document.querySelector("#ytts-settings-modal")).toBeNull();
+    expect(notification.showNotification).toHaveBeenCalledWith(
+      "✅ Settings saved!",
+    );
+    expect(notification.showNotification).not.toHaveBeenCalledWith(
+      "❌ Failed to save settings",
+      1500,
+    );
   });
 
   it("persists the retention window typed into the field", () => {

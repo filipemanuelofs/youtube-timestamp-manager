@@ -11,6 +11,24 @@ const META_PREFIX = "yttsmeta_";
 // configurações e para todo valor gravado que não sirva como número de dias.
 const DEFAULT_RETENTION_DAYS = 30;
 
+// Formas disponíveis para o marcador na barra de progresso. `bar` fica com
+// glifo vazio de propósito: ela continua sendo desenhada como uma `div` com
+// `background`, exatamente como antes da configuração existir, e o `▮` só
+// serve de rótulo no `<select>` do modal.
+export const MARKER_SHAPES = {
+  bar: { label: "▮ Bar", glyph: "" },
+  star: { label: "★ Star", glyph: "★" },
+  arrow: { label: "▼ Arrow", glyph: "▼" },
+  cross: { label: "✕ Cross", glyph: "✕" },
+};
+
+export const DEFAULT_MARKER_SHAPE = "bar";
+export const DEFAULT_MARKER_COLOR = "#ff6b6b";
+
+// Só hexadecimal de 6 dígitos: é o único formato que `<input type="color">`
+// produz e o único que `hexToRgba` converte para o brilho do marcador.
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
 /**
  * Salva um array de timestamps no localStorage para o vídeo indicado.
  * Chave de armazenamento: `ytts_${videoId}`.
@@ -142,6 +160,42 @@ export function getRetentionDays() {
     return Number.isNaN(days) || days < 1 ? DEFAULT_RETENTION_DAYS : days;
   } catch {
     return DEFAULT_RETENTION_DAYS;
+  }
+}
+
+/**
+ * Lê a forma configurada para o marcador na barra de progresso.
+ * Chave ausente, forma fora de `MARKER_SHAPES` ou `localStorage` inacessível
+ * caem no padrão — um valor corrompido não pode deixar o marcador sem forma
+ * para desenhar.
+ * @returns {string} Chave de `MARKER_SHAPES`.
+ */
+export function getMarkerShape() {
+  try {
+    const shape = localStorage.getItem("ytts_marker_shape");
+    // `Object.hasOwn` em vez de `MARKER_SHAPES[shape]`: um valor gravado como
+    // `"toString"` ou `"constructor"` acharia membro no protótipo e passaria
+    // pela guarda.
+    return Object.hasOwn(MARKER_SHAPES, shape ?? "")
+      ? shape
+      : DEFAULT_MARKER_SHAPE;
+  } catch {
+    return DEFAULT_MARKER_SHAPE;
+  }
+}
+
+/**
+ * Lê a cor configurada para o marcador na barra de progresso.
+ * Chave ausente, cor fora de `#rrggbb` ou `localStorage` inacessível caem no
+ * padrão, que é o vermelho usado antes da configuração existir.
+ * @returns {string} Cor no formato `#rrggbb`.
+ */
+export function getMarkerColor() {
+  try {
+    const color = localStorage.getItem("ytts_marker_color");
+    return HEX_COLOR_RE.test(color ?? "") ? color : DEFAULT_MARKER_COLOR;
+  } catch {
+    return DEFAULT_MARKER_COLOR;
   }
 }
 
