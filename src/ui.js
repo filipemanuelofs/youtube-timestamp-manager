@@ -216,10 +216,6 @@ const STYLES = `
   .ytts-progress-markers div {
     transition: all 0.2s ease;
   }
-  .ytts-progress-markers div:hover {
-    height: 16px !important;
-    box-shadow: 0 0 8px rgba(255, 107, 107, 0.8) !important;
-  }
   #ytts-settings-modal {
     position: fixed;
     top: 0;

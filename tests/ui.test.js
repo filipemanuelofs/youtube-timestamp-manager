@@ -430,6 +430,18 @@ describe("init", () => {
     anchor.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(video.currentTime).toBe(30);
   });
+
+  // A folha de estilo tinha uma regra `.ytts-progress-markers div:hover` com
+  // `!important`, que vencia o estilo inline aplicado no hover por
+  // `progressMarkers`: forçava `height: 16px` no wrapper (deslocando o
+  // marcador) e um `box-shadow` vermelho fixo, ignorando a forma e a cor
+  // configuradas pelo usuário.
+  it("ships no stylesheet rule that overrides the marker hover", () => {
+    const styles = ui.init().querySelector("style").textContent;
+
+    expect(styles).not.toContain(".ytts-progress-markers div:hover");
+    expect(styles).not.toContain("rgba(255, 107, 107, 0.8)");
+  });
 });
 
 describe("settings", () => {
