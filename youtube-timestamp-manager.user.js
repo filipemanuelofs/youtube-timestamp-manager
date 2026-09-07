@@ -653,7 +653,7 @@
         top: 50%;
         transform: translate(-50%, -50%);
         color: ${color};
-        font-size: 14px;
+        font-size: 18px;
         line-height: 1;
         text-shadow: 0 0 4px ${glow};
         transition: all 0.2s ease;

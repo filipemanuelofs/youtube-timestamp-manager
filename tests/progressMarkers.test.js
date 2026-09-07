@@ -229,6 +229,7 @@ describe("marker shape and colour", () => {
     progressMarkers.updateMarkers();
 
     expect(marker().textContent).toBe("★");
+    expect(marker().style.fontSize).toBe("18px");
     expect(marker().style.color).toBe("rgb(0, 255, 0)");
     expect(marker().style.textShadow).toBe("0 0 4px rgba(0, 255, 0, 0.6)");
     expect(marker().style.backgroundColor).toBe("");
