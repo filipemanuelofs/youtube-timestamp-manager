@@ -219,34 +219,28 @@ export function removeExpiredFromStorage() {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       if (key && key.startsWith(PREFIX)) {
-        const data = localStorage.getItem(key);
-        if (data) {
-          const timestamps = JSON.parse(data);
+        const videoId = key.replace(PREFIX, "");
+        // `loadTimestamps` já isola JSON ilegível e valores de configuração que
+        // compartilham o prefixo, permitindo que a varredura siga para a chave
+        // seguinte sem apagar o dado que não conseguiu interpretar.
+        const timestamps = loadTimestamps(videoId);
 
-          // Sem esta guarda, `ytts_auto_cleanup` (que vira `true`) e
-          // `ytts_pane_position` (que vira objeto) chegam aqui sem `.filter`; o
-          // TypeError cai no catch de fora e aborta a varredura inteira, então
-          // os vídeos ainda não visitados no laço nunca são limpos.
-          if (!Array.isArray(timestamps)) continue;
+        const valid = timestamps.filter((ts) => {
+          const created = Date.parse(ts.creation);
+          // `creation` ausente ou ilegível vira NaN: sem âncora temporal não
+          // há como afirmar que expirou, e apagar destruiria dado do usuário
+          // por causa de um campo que faltou.
+          return Number.isNaN(created) || created >= cutoff;
+        });
 
-          const valid = timestamps.filter((ts) => {
-            const created = Date.parse(ts.creation);
-            // `creation` ausente ou ilegível vira NaN: sem âncora temporal não
-            // há como afirmar que expirou, e apagar destruiria dado do usuário
-            // por causa de um campo que faltou.
-            return Number.isNaN(created) || created >= cutoff;
-          });
-
-          if (valid.length !== timestamps.length) {
-            const videoId = key.replace(PREFIX, "");
-            cleanedCount += timestamps.length - valid.length;
-            affectedVideoIds.push(videoId);
-            if (valid.length > 0) {
-              localStorage.setItem(key, JSON.stringify(valid));
-            } else {
-              localStorage.removeItem(key);
-              emptiedVideoIds.push(videoId);
-            }
+        if (valid.length !== timestamps.length) {
+          cleanedCount += timestamps.length - valid.length;
+          affectedVideoIds.push(videoId);
+          if (valid.length > 0) {
+            localStorage.setItem(key, JSON.stringify(valid));
+          } else {
+            localStorage.removeItem(key);
+            emptiedVideoIds.push(videoId);
           }
         }
       }

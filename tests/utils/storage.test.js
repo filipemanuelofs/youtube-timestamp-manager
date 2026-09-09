@@ -359,6 +359,8 @@ describe("removeExpiredFromStorage", () => {
     localStorage.setItem("ytts_auto_cleanup", "true");
     localStorage.setItem("ytts_start_minimized", "false");
     localStorage.setItem("ytts_pane_position", JSON.stringify({ top: 1, left: 2 }));
+    localStorage.setItem("ytts_marker_shape", "bar");
+    localStorage.setItem("ytts_marker_color", "#ff6b6b");
 
     const { cleanedCount, affectedVideoIds } = removeExpiredFromStorage();
 
@@ -368,6 +370,8 @@ describe("removeExpiredFromStorage", () => {
     expect(localStorage.getItem("ytts_pane_position")).toBe(
       JSON.stringify({ top: 1, left: 2 }),
     );
+    expect(localStorage.getItem("ytts_marker_shape")).toBe("bar");
+    expect(localStorage.getItem("ytts_marker_color")).toBe("#ff6b6b");
   });
 
   it("removes the title when the video loses every timestamp", () => {
@@ -437,14 +441,16 @@ describe("storage resilience", () => {
     expect(console.error).toHaveBeenCalled();
   });
 
-  it("removeExpiredFromStorage survives corrupt data and leaves it in place", () => {
+  it("removeExpiredFromStorage skips corrupt data and keeps sweeping", () => {
+    saveTimestamps("vid1", [{ time: 10, creation: daysAgo(40) }]);
     localStorage.setItem("ytts_broken", "{not json");
     let result;
     expect(() => {
       result = removeExpiredFromStorage();
     }).not.toThrow();
 
-    expect(result).toEqual({ cleanedCount: 0, affectedVideoIds: [] });
+    expect(result).toEqual({ cleanedCount: 1, affectedVideoIds: ["vid1"] });
+    expect(localStorage.getItem("ytts_vid1")).toBeNull();
     expect(localStorage.getItem("ytts_broken")).toBe("{not json");
     expect(console.error).toHaveBeenCalled();
   });

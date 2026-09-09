@@ -506,24 +506,20 @@
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
         if (key && key.startsWith(PREFIX)) {
-          const data = localStorage.getItem(key);
-          if (data) {
-            const timestamps = JSON.parse(data);
-            if (!Array.isArray(timestamps)) continue;
-            const valid = timestamps.filter((ts) => {
-              const created = Date.parse(ts.creation);
-              return Number.isNaN(created) || created >= cutoff;
-            });
-            if (valid.length !== timestamps.length) {
-              const videoId = key.replace(PREFIX, "");
-              cleanedCount += timestamps.length - valid.length;
-              affectedVideoIds.push(videoId);
-              if (valid.length > 0) {
-                localStorage.setItem(key, JSON.stringify(valid));
-              } else {
-                localStorage.removeItem(key);
-                emptiedVideoIds.push(videoId);
-              }
+          const videoId = key.replace(PREFIX, "");
+          const timestamps = loadTimestamps(videoId);
+          const valid = timestamps.filter((ts) => {
+            const created = Date.parse(ts.creation);
+            return Number.isNaN(created) || created >= cutoff;
+          });
+          if (valid.length !== timestamps.length) {
+            cleanedCount += timestamps.length - valid.length;
+            affectedVideoIds.push(videoId);
+            if (valid.length > 0) {
+              localStorage.setItem(key, JSON.stringify(valid));
+            } else {
+              localStorage.removeItem(key);
+              emptiedVideoIds.push(videoId);
             }
           }
         }
