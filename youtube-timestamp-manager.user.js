@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            YouTube Timestamp Manager
 // @name:pt         Gerenciador de Timestamps do YouTube
-// @version         1.10.2
+// @version         1.10.3
 // @description     Create, manage and copy YouTube video timestamps with notes. Perfect for live streams.
 // @description:pt  Crie, gerencie e copie timestamps de vídeos do YouTube com anotações. Perfeito para vídeos ao vivo.
 // @author          filipemanuelofs
@@ -1824,7 +1824,7 @@
           });
           const footer = el("div", { className: "ytts-settings-footer" }, [
             el("div", { className: "ytts-settings-version" }, [
-              el("span", { textContent: `v${"1.10.2"}` }),
+              el("span", { textContent: `v${"1.10.3"}` }),
               el("span", {
                 className: "ytts-settings-version-separator",
                 textContent: "|"
