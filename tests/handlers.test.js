@@ -586,6 +586,30 @@ describe("backup handlers", () => {
     expect(notifySpy).toHaveBeenLastCalledWith("📥 1 timestamp imported!");
   });
 
+  it("runs cleanup when the imported settings enable it", async () => {
+    saveTimestamps("vid1", [
+      { time: 10, note: "expired", creation: expired },
+    ]);
+    handlers.loadSavedTimestamps();
+    const file = new File(
+      [
+        JSON.stringify({
+          format: "ytts-backup",
+          version: 1,
+          settings: { ytts_auto_cleanup: true },
+          videos: [],
+        }),
+      ],
+      "backup.json",
+      { type: "application/json" },
+    );
+
+    await handlers.importBackup(file);
+
+    expect(loadTimestamps("vid1")).toEqual([]);
+    expect(readListItems()).toEqual([]);
+  });
+
   it("rejects an invalid envelope without writing or closing the modal", async () => {
     const modal = document.createElement("div");
     modal.id = "ytts-settings-modal";

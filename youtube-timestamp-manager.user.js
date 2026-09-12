@@ -2546,6 +2546,8 @@
           if (currentVideoId && result.affectedVideoIds.includes(currentVideoId)) {
             document.querySelectorAll("#ytls-pane ul li:not(.now-playing)").forEach((item) => item.remove());
             handlers.loadSavedTimestamps();
+          } else if (ui.getAutoCleanupSetting()) {
+            handlers.cleanExpired();
           }
           progressMarkers.updateMarkers();
           ui.updateSelectionUI();
