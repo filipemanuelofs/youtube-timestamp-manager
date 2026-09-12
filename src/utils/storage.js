@@ -1,3 +1,5 @@
+import { DEFAULT_HOTKEY } from "./hotkey.js";
+
 const PREFIX = "ytts_";
 // Metadado do vídeo (hoje só o título) fica em chave própria para não mexer no
 // formato de array puro que `loadTimestamps` e `removeExpiredFromStorage` leem.
@@ -145,6 +147,50 @@ export function deleteVideoTimestamps(videoId) {
     console.error("[YT Timestamp Manager] Failed to delete timestamps:", error);
   }
   deleteVideoTitle(videoId);
+}
+
+/**
+ * Lê a configuração de limpeza automática de timestamps expirados.
+ * @returns {boolean} `true` se a limpeza automática estiver habilitada.
+ */
+export function getAutoCleanup() {
+  try {
+    return localStorage.getItem("ytts_auto_cleanup") === "true";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Lê a preferência de iniciar o painel minimizado.
+ * @returns {boolean} `true` se o painel deve iniciar minimizado.
+ */
+export function getStartMinimized() {
+  try {
+    const value = localStorage.getItem("ytts_start_minimized");
+    return value === null ? true : value === "true";
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Lê o atalho configurado para criar timestamp.
+ * @returns {{key: string, ctrl: boolean, alt: boolean, shift: boolean, meta: boolean}|null}
+ *   Atalho configurado, ou `null` se desligado.
+ */
+export function getHotkey() {
+  try {
+    const raw = localStorage.getItem("ytts_hotkey");
+    if (raw === null) return DEFAULT_HOTKEY;
+    const parsed = JSON.parse(raw);
+    if (parsed === null) return null;
+    return parsed && typeof parsed.key === "string" && parsed.key
+      ? parsed
+      : DEFAULT_HOTKEY;
+  } catch {
+    return DEFAULT_HOTKEY;
+  }
 }
 
 /**

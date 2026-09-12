@@ -10,11 +10,13 @@ import {
   getRetentionDays,
   getMarkerShape,
   getMarkerColor,
+  getAutoCleanup,
+  getStartMinimized,
+  getHotkey,
   MARKER_SHAPES,
 } from "./utils/storage.js";
 import { getVideoId } from "./utils/video.js";
 import {
-  DEFAULT_HOTKEY,
   formatHotkey,
   hotkeyFromEvent,
 } from "./utils/hotkey.js";
@@ -351,7 +353,9 @@ const STYLES = `
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
   .ytts-settings-footer button,
-  #ytts-reset-position {
+  #ytts-reset-position,
+  #ytts-export-backup,
+  #ytts-import-backup {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -362,7 +366,9 @@ const STYLES = `
     transition: all 0.2s ease;
   }
   .ytts-settings-footer button:hover,
-  #ytts-reset-position:hover {
+  #ytts-reset-position:hover,
+  #ytts-export-backup:hover,
+  #ytts-import-backup:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.5);
   }
@@ -426,7 +432,8 @@ const STYLES = `
     color: white;
     border-bottom-color: #4FC3F7;
   }
-  #ytts-tab-videos {
+  #ytts-tab-videos,
+  #ytts-tab-backup {
     width: 420px;
     max-width: 100%;
   }
@@ -798,9 +805,15 @@ export const ui = {
       textContent: "Videos",
     });
 
+    const backupTabBtn = el("button", {
+      className: "ytts-tab",
+      textContent: "Backup",
+    });
+
     const tabs = el("div", { className: "ytts-tabs" }, [
       settingsTabBtn,
       videosTabBtn,
+      backupTabBtn,
     ]);
 
     const settingsTab = el("div", { id: "ytts-tab-settings" });
@@ -810,9 +823,42 @@ export const ui = {
       style: { display: "none" },
     });
 
+    const backupFileInput = el("input", {
+      type: "file",
+      accept: "application/json,.json",
+      style: { display: "none" },
+      on: {
+        change: () => {
+          const file = backupFileInput.files?.[0];
+          if (file) handlers.importBackup(file);
+        },
+      },
+    });
+    const backupTab = el(
+      "div",
+      { id: "ytts-tab-backup", style: { display: "none" } },
+      [
+        el("p", {
+          textContent: "Back up your settings and all saved video timestamps.",
+        }),
+        el("button", {
+          id: "ytts-export-backup",
+          textContent: "Export backup",
+          on: { click: handlers.exportBackup },
+        }),
+        el("button", {
+          id: "ytts-import-backup",
+          textContent: "Import backup",
+          on: { click: () => backupFileInput.click() },
+        }),
+        backupFileInput,
+      ],
+    );
+
     const body = el("div", { className: "ytts-settings-body" }, [
       settingsTab,
       videosTab,
+      backupTab,
     ]);
 
     // Somente leitura: o valor vem do `keydown` capturado, nunca do que for
@@ -989,19 +1035,21 @@ export const ui = {
 
     document.body.appendChild(modal);
 
-    // Save grava preferência, e a aba de vídeos não tem preferência a gravar:
-    // some junto com o conteúdo de Settings.
-    const showVideosTab = (videos) => {
-      settingsTab.style.display = videos ? "none" : "";
-      videosTab.style.display = videos ? "" : "none";
-      settingsTabBtn.classList.toggle("ytts-tab-active", !videos);
-      videosTabBtn.classList.toggle("ytts-tab-active", videos);
-      saveBtn.style.display = videos ? "none" : "";
-      if (videos) ui.renderVideoList(videosTab);
+    // Save grava preferências e só pertence à aba Settings.
+    const showTab = (name) => {
+      settingsTab.style.display = name === "settings" ? "" : "none";
+      videosTab.style.display = name === "videos" ? "" : "none";
+      backupTab.style.display = name === "backup" ? "" : "none";
+      settingsTabBtn.classList.toggle("ytts-tab-active", name === "settings");
+      videosTabBtn.classList.toggle("ytts-tab-active", name === "videos");
+      backupTabBtn.classList.toggle("ytts-tab-active", name === "backup");
+      saveBtn.style.display = name === "settings" ? "" : "none";
+      if (name === "videos") ui.renderVideoList(videosTab);
     };
 
-    settingsTabBtn.addEventListener("click", () => showVideosTab(false));
-    videosTabBtn.addEventListener("click", () => showVideosTab(true));
+    settingsTabBtn.addEventListener("click", () => showTab("settings"));
+    videosTabBtn.addEventListener("click", () => showTab("videos"));
+    backupTabBtn.addEventListener("click", () => showTab("backup"));
 
     closeBtn.addEventListener("click", () => modal.remove());
     cancelBtn.addEventListener("click", () => modal.remove());
@@ -1116,11 +1164,7 @@ export const ui = {
    * @returns {boolean} `true` se a limpeza automática estiver habilitada.
    */
   getAutoCleanupSetting() {
-    try {
-      return localStorage.getItem("ytts_auto_cleanup") === "true";
-    } catch {
-      return false;
-    }
+    return getAutoCleanup();
   },
 
   /**
@@ -1155,27 +1199,11 @@ export const ui = {
    *   Atalho configurado, ou `null` se desligado.
    */
   getHotkeySetting() {
-    try {
-      const raw = localStorage.getItem("ytts_hotkey");
-      if (raw === null) return DEFAULT_HOTKEY;
-      const parsed = JSON.parse(raw);
-      if (parsed === null) return null;
-      if (parsed && typeof parsed.key === "string" && parsed.key) {
-        return parsed;
-      }
-      return DEFAULT_HOTKEY;
-    } catch {
-      return DEFAULT_HOTKEY;
-    }
+    return getHotkey();
   },
 
   getStartMinimizedSetting() {
-    try {
-      const val = localStorage.getItem("ytts_start_minimized");
-      return val === null ? true : val === "true";
-    } catch {
-      return true;
-    }
+    return getStartMinimized();
   },
 
   /**

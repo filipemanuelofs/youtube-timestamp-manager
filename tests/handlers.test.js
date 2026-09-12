@@ -540,6 +540,67 @@ describe("loadSavedTimestamps", () => {
   });
 });
 
+describe("backup handlers", () => {
+  it("exports even without saved videos", () => {
+    const createObjectURL = vi.fn(() => "blob:backup");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    handlers.exportBackup();
+
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:backup");
+    expect(notifySpy).toHaveBeenCalledWith("📤 Backup exported!");
+  });
+
+  it("imports the current video and redraws its rows and markers", async () => {
+    const modal = document.createElement("div");
+    modal.id = "ytts-settings-modal";
+    document.body.appendChild(modal);
+    const file = new File(
+      [
+        JSON.stringify({
+          format: "ytts-backup",
+          version: 1,
+          settings: {},
+          videos: [
+            {
+              videoId: "vid1",
+              title: "Importado",
+              timestamps: [{ time: 25, note: "nova", creation: past }],
+            },
+          ],
+        }),
+      ],
+      "backup.json",
+      { type: "application/json" },
+    );
+
+    const result = await handlers.importBackup(file);
+
+    expect(result.timestampsAdded).toBe(1);
+    expect(readListItems()).toEqual([{ time: "25", note: "nova" }]);
+    expect(progressMarkers.updateMarkers).toHaveBeenCalled();
+    expect(document.querySelector("#ytts-settings-modal")).toBeNull();
+    expect(notifySpy).toHaveBeenLastCalledWith("📥 1 timestamp imported!");
+  });
+
+  it("rejects an invalid envelope without writing or closing the modal", async () => {
+    const modal = document.createElement("div");
+    modal.id = "ytts-settings-modal";
+    document.body.appendChild(modal);
+    const file = new File(["{}"], "backup.json", {
+      type: "application/json",
+    });
+
+    expect(await handlers.importBackup(file)).toBeNull();
+    expect(localStorage.length).toBe(0);
+    expect(document.querySelector("#ytts-settings-modal")).toBe(modal);
+    expect(notifySpy).toHaveBeenCalledWith("❌ Invalid backup file");
+  });
+});
+
 describe("cleanExpired", () => {
   it("drops expired stamps and redraws the list of the current video", () => {
     saveTimestamps("vid1", [

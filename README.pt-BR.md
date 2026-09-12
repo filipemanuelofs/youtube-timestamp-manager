@@ -20,6 +20,7 @@
   escolher
 - 💾 **Salvamento automático** - os timestamps ficam guardados por vídeo e
   expiram no prazo que você escolher (30 dias por padrão)
+- 📦 **Backup e restauração** - exporte configurações e timestamps em um arquivo JSON
 - ⠿ **Arrastar o painel** - pegue pela alça e solte onde quiser; o lugar fica guardado
 - 🔽 **Minimizar o painel** para não atrapalhar a experiência de assistir
 - ⚡ **Navegação rápida** - clique no timestamp para pular para aquele momento
@@ -153,6 +154,18 @@ abri-lo de novo e mexer nos timestamps.
 A aba vive dentro do painel, então ela só é alcançável de uma página de vídeo
 (`/watch`, `/live/`, `/shorts/`) — não da home do YouTube.
 
+## 📦 Backup
+
+Abra a aba **Backup** no modal de configurações para exportar um único arquivo
+`.json` com todas as configurações e os timestamps e títulos de cada vídeo
+salvo. A posição do widget fica de fora de propósito, evitando que a importação
+em uma tela diferente coloque o painel fora da área visível.
+
+A importação mescla o arquivo com os dados locais em vez de apagá-los. As
+configurações do arquivo substituem as atuais; os timestamps são adicionados e
+ordenados pelo tempo. Se o vídeo já tiver um timestamp no mesmo segundo
+arredondado, o existente — inclusive sua anotação — é preservado.
+
 ### Sites suportados
 
 - ✅ `youtube.com/watch` - vídeos comuns
@@ -183,6 +196,7 @@ src/
 └── utils/
     ├── time.js         ← converte segundos em tempo legível (ex.: 1:23:45)
     ├── clipboard.js    ← cuida da cópia de texto para a área de transferência
+    ├── backup.js       ← exporta, valida e importa arquivos de backup
     ├── storage.js      ← salva e carrega timestamps no navegador (localStorage)
     ├── notification.js ← mostra mensagens rápidas de sucesso/erro na tela
     ├── debounce.js     ← evita que ações disparem vezes demais seguidas

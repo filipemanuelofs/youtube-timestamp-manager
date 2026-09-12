@@ -5,6 +5,13 @@ import { copyToClipboard, showCopyFeedback } from "./utils/clipboard.js";
 import { showNotification } from "./utils/notification.js";
 import { matchesHotkey } from "./utils/hotkey.js";
 import {
+  applyBackup,
+  buildBackup,
+  downloadBackup,
+  parseBackup,
+  readBackupFile,
+} from "./utils/backup.js";
+import {
   saveTimestamps,
   loadTimestamps,
   removeExpiredFromStorage,
@@ -305,6 +312,51 @@ export const handlers = {
     if (ui.getAutoCleanupSetting()) {
       handlers.cleanExpired();
     }
+  },
+
+  /**
+   * Monta e baixa um backup das configurações e timestamps salvos.
+   */
+  exportBackup() {
+    downloadBackup(buildBackup());
+    showNotification("📤 Backup exported!");
+  },
+
+  /**
+   * Lê e aplica um arquivo de backup, atualizando o painel aberto.
+   * @param {File} file - Arquivo escolhido pelo usuário.
+   * @returns {Promise<object|null>} Resultado da importação, ou `null` se inválida.
+   */
+  async importBackup(file) {
+    let data;
+    try {
+      data = parseBackup(await readBackupFile(file));
+    } catch {
+      data = null;
+    }
+
+    if (!data) {
+      showNotification("❌ Invalid backup file");
+      return null;
+    }
+
+    const result = applyBackup(data);
+    const currentVideoId = getVideoId();
+    if (currentVideoId && result.affectedVideoIds.includes(currentVideoId)) {
+      document
+        .querySelectorAll("#ytls-pane ul li:not(.now-playing)")
+        .forEach((item) => item.remove());
+      handlers.loadSavedTimestamps();
+    }
+    progressMarkers.updateMarkers();
+    ui.updateSelectionUI();
+    document.querySelector("#ytts-settings-modal")?.remove();
+    showNotification(
+      `📥 ${result.timestampsAdded} timestamp${
+        result.timestampsAdded === 1 ? "" : "s"
+      } imported!`,
+    );
+    return result;
   },
 
   /**

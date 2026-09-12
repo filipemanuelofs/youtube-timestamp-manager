@@ -19,6 +19,7 @@
   video scrubber, in the shape (bar, ★, ▼ or ✕) and colour you pick
 - 💾 **Automatic saving** - timestamps persist per video and expire after a
   window you choose (30 days by default)
+- 📦 **Backup and restore** - export settings and timestamps to one JSON file
 - ⠿ **Drag the panel anywhere** - grab the handle and drop it where it suits you; the spot is remembered
 - 🔽 **Minimize panel** to avoid interfering with viewing experience
 - ⚡ **Quick navigation** - click timestamp to jump to that moment
@@ -152,6 +153,18 @@ timestamps.
 The tab lives inside the panel, so it is reachable from a video page (`/watch`,
 `/live/`, `/shorts/`) — not from the YouTube home page.
 
+## 📦 Backup
+
+Open the **Backup** tab in the settings modal to export one `.json` file with
+all settings and every saved video's timestamps and title. The widget position
+is intentionally excluded, so importing on a different screen cannot place the
+panel outside the viewport.
+
+Importing merges the file with local data instead of deleting it. Settings from
+the file replace the current settings; timestamps are added and sorted by time.
+If that video already has a timestamp in the same rounded second, the existing
+one — including its note — is kept.
+
 ### Supported Sites
 
 - ✅ `youtube.com/watch` - Regular videos
@@ -182,6 +195,7 @@ src/
 └── utils/
     ├── time.js         ← converts seconds to readable time (e.g. 1:23:45)
     ├── clipboard.js    ← handles copying text to clipboard
+    ├── backup.js       ← exports, validates and imports backup files
     ├── storage.js      ← saves and loads timestamps in the browser (localStorage)
     ├── notification.js ← shows brief success/error messages on screen
     ├── debounce.js     ← prevents actions from firing too many times at once

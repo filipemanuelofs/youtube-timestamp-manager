@@ -825,15 +825,15 @@ describe("settings", () => {
 describe("settings modal tabs", () => {
   const tabButtons = () => document.querySelectorAll(".ytts-tab");
 
-  it("opens on Settings, with the video tab hidden", () => {
+  it("opens on Settings with the other panes hidden", () => {
     ui.openSettingsModal();
-    const [settingsTab, videosTab] = tabButtons();
+    const [settingsTab, videosTab, backupTab] = tabButtons();
 
     expect(settingsTab.classList.contains("ytts-tab-active")).toBe(true);
     expect(videosTab.classList.contains("ytts-tab-active")).toBe(false);
-    expect(document.querySelector("#ytts-tab-videos").style.display).toBe(
-      "none",
-    );
+    expect(backupTab.classList.contains("ytts-tab-active")).toBe(false);
+    expect(document.querySelector("#ytts-tab-videos").style.display).toBe("none");
+    expect(document.querySelector("#ytts-tab-backup").style.display).toBe("none");
     expect(
       document.querySelector("#ytts-tab-settings #auto-cleanup-expired"),
     ).not.toBeNull();
@@ -845,32 +845,35 @@ describe("settings modal tabs", () => {
     ).not.toBeNull();
   });
 
-  it("swaps the panes back and forth", () => {
+  it("shows only the selected pane", () => {
     ui.openSettingsModal();
-    const [settingsTab, videosTab] = tabButtons();
-    const settingsPane = document.querySelector("#ytts-tab-settings");
-    const videosPane = document.querySelector("#ytts-tab-videos");
+    const buttons = [...tabButtons()];
+    const panes = [
+      document.querySelector("#ytts-tab-settings"),
+      document.querySelector("#ytts-tab-videos"),
+      document.querySelector("#ytts-tab-backup"),
+    ];
 
-    videosTab.click();
-    expect(settingsPane.style.display).toBe("none");
-    expect(videosPane.style.display).toBe("");
-    expect(videosTab.classList.contains("ytts-tab-active")).toBe(true);
-    expect(settingsTab.classList.contains("ytts-tab-active")).toBe(false);
-
-    settingsTab.click();
-    expect(settingsPane.style.display).toBe("");
-    expect(videosPane.style.display).toBe("none");
-    expect(settingsTab.classList.contains("ytts-tab-active")).toBe(true);
+    buttons.forEach((button, selected) => {
+      button.click();
+      panes.forEach((pane, index) => {
+        expect(pane.style.display).toBe(index === selected ? "" : "none");
+        expect(buttons[index].classList.contains("ytts-tab-active")).toBe(
+          index === selected,
+        );
+      });
+    });
   });
 
-  it("hides Save on the Videos tab and brings it back on Settings", () => {
+  it("shows Save only on Settings", () => {
     ui.openSettingsModal();
-    const [settingsTab, videosTab] = tabButtons();
+    const [settingsTab, videosTab, backupTab] = tabButtons();
     const save = document.querySelector("#ytts-save-settings");
 
     videosTab.click();
     expect(save.style.display).toBe("none");
-
+    backupTab.click();
+    expect(save.style.display).toBe("none");
     settingsTab.click();
     expect(save.style.display).toBe("");
   });
@@ -889,10 +892,51 @@ describe("settings modal tabs", () => {
     ui.openSettingsModal();
     expect(render).not.toHaveBeenCalled();
 
+    tabButtons()[2].click();
+    expect(render).not.toHaveBeenCalled();
     tabButtons()[1].click();
     expect(render).toHaveBeenCalledWith(
       document.querySelector("#ytts-tab-videos"),
     );
+  });
+
+  it("styles the Backup pane and actions like their existing counterparts", () => {
+    const styles = ui.init().querySelector("style").textContent;
+
+    expect(styles).toContain(
+      "#ytts-reset-position,\n  #ytts-export-backup,\n  #ytts-import-backup",
+    );
+    expect(styles).toContain(
+      "#ytts-reset-position:hover,\n  #ytts-export-backup:hover,\n  #ytts-import-backup:hover",
+    );
+    expect(styles).toContain("#ytts-tab-videos,\n  #ytts-tab-backup");
+  });
+
+  it("mounts the Backup actions and wires export and file import", () => {
+    const exportBackup = vi.spyOn(handlers, "exportBackup").mockImplementation(() => {});
+    const importBackup = vi.spyOn(handlers, "importBackup").mockResolvedValue(null);
+    ui.openSettingsModal();
+    tabButtons()[2].click();
+
+    const pane = document.querySelector("#ytts-tab-backup");
+    const exportButton = pane.querySelector("#ytts-export-backup");
+    const importButton = pane.querySelector("#ytts-import-backup");
+    const input = pane.querySelector('input[type="file"]');
+    expect(exportButton.textContent).toBe("Export backup");
+    expect(importButton.textContent).toBe("Import backup");
+    expect(input.accept).toBe("application/json,.json");
+
+    exportButton.click();
+    expect(exportBackup).toHaveBeenCalled();
+
+    const inputClick = vi.spyOn(input, "click").mockImplementation(() => {});
+    importButton.click();
+    expect(inputClick).toHaveBeenCalled();
+
+    const file = new File(["{}"], "backup.json", { type: "application/json" });
+    Object.defineProperty(input, "files", { value: [file] });
+    input.dispatchEvent(new Event("change"));
+    expect(importBackup).toHaveBeenCalledWith(file);
   });
 });
 

@@ -402,6 +402,51 @@
     }
   });
 
+  // src/utils/hotkey.js
+  function normalizeKey(key) {
+    if (key === " ") return "Space";
+    return key.length === 1 ? key.toUpperCase() : key;
+  }
+  function hotkeyFromEvent(event) {
+    if (!event || !event.key || MODIFIER_KEYS.includes(event.key)) return null;
+    return {
+      key: normalizeKey(event.key),
+      ctrl: !!event.ctrlKey,
+      alt: !!event.altKey,
+      shift: !!event.shiftKey,
+      meta: !!event.metaKey
+    };
+  }
+  function formatHotkey(hotkey) {
+    if (!hotkey || !hotkey.key) return "";
+    const parts = [];
+    if (hotkey.ctrl) parts.push("Ctrl");
+    if (hotkey.alt) parts.push("Alt");
+    if (hotkey.shift) parts.push("Shift");
+    if (hotkey.meta) parts.push("Meta");
+    parts.push(normalizeKey(hotkey.key));
+    return parts.join("+");
+  }
+  function matchesHotkey(event, hotkey) {
+    if (!event || !hotkey || !hotkey.key) return false;
+    const pressed = hotkeyFromEvent(event);
+    if (!pressed) return false;
+    return pressed.key === normalizeKey(hotkey.key) && pressed.ctrl === !!hotkey.ctrl && pressed.alt === !!hotkey.alt && pressed.shift === !!hotkey.shift && pressed.meta === !!hotkey.meta;
+  }
+  var MODIFIER_KEYS, DEFAULT_HOTKEY;
+  var init_hotkey = __esm({
+    "src/utils/hotkey.js"() {
+      MODIFIER_KEYS = ["Shift", "Control", "Alt", "Meta", "AltGraph"];
+      DEFAULT_HOTKEY = {
+        key: "S",
+        ctrl: false,
+        alt: false,
+        shift: true,
+        meta: false
+      };
+    }
+  });
+
   // src/utils/storage.js
   function saveTimestamps(videoId, timestamps) {
     try {
@@ -473,6 +518,32 @@
     }
     deleteVideoTitle(videoId);
   }
+  function getAutoCleanup() {
+    try {
+      return localStorage.getItem("ytts_auto_cleanup") === "true";
+    } catch {
+      return false;
+    }
+  }
+  function getStartMinimized() {
+    try {
+      const value = localStorage.getItem("ytts_start_minimized");
+      return value === null ? true : value === "true";
+    } catch {
+      return true;
+    }
+  }
+  function getHotkey() {
+    try {
+      const raw = localStorage.getItem("ytts_hotkey");
+      if (raw === null) return DEFAULT_HOTKEY;
+      const parsed = JSON.parse(raw);
+      if (parsed === null) return null;
+      return parsed && typeof parsed.key === "string" && parsed.key ? parsed : DEFAULT_HOTKEY;
+    } catch {
+      return DEFAULT_HOTKEY;
+    }
+  }
   function getRetentionDays() {
     try {
       const days = parseInt(localStorage.getItem("ytts_retention_days"), 10);
@@ -536,6 +607,7 @@
   var PREFIX, META_PREFIX, DEFAULT_RETENTION_DAYS, MARKER_SHAPES, DEFAULT_MARKER_SHAPE, DEFAULT_MARKER_COLOR, HEX_COLOR_RE;
   var init_storage = __esm({
     "src/utils/storage.js"() {
+      init_hotkey();
       PREFIX = "ytts_";
       META_PREFIX = "yttsmeta_";
       DEFAULT_RETENTION_DAYS = 30;
@@ -854,48 +926,153 @@
     }
   });
 
-  // src/utils/hotkey.js
-  function normalizeKey(key) {
-    if (key === " ") return "Space";
-    return key.length === 1 ? key.toUpperCase() : key;
+  // src/utils/backup.js
+  function serializeSetting(key, value) {
+    if (key === "ytts_auto_cleanup" || key === "ytts_start_minimized") {
+      return typeof value === "boolean" ? String(value) : void 0;
+    }
+    if (key === "ytts_retention_days") {
+      return Number.isInteger(value) && value >= 1 ? String(value) : void 0;
+    }
+    if (key === "ytts_marker_shape") {
+      return typeof value === "string" && Object.hasOwn(MARKER_SHAPES, value) ? value : void 0;
+    }
+    if (key === "ytts_marker_color") {
+      return typeof value === "string" && HEX_COLOR_RE2.test(value) ? value : void 0;
+    }
+    if (key === "ytts_hotkey") {
+      return value === null || value && typeof value === "object" && typeof value.key === "string" && value.key ? JSON.stringify(value) : void 0;
+    }
   }
-  function hotkeyFromEvent(event) {
-    if (!event || !event.key || MODIFIER_KEYS.includes(event.key)) return null;
+  function buildBackup() {
     return {
-      key: normalizeKey(event.key),
-      ctrl: !!event.ctrlKey,
-      alt: !!event.altKey,
-      shift: !!event.shiftKey,
-      meta: !!event.metaKey
+      format: "ytts-backup",
+      version: 1,
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      settings: {
+        ytts_auto_cleanup: getAutoCleanup(),
+        ytts_start_minimized: getStartMinimized(),
+        ytts_hotkey: getHotkey(),
+        ytts_retention_days: getRetentionDays(),
+        ytts_marker_shape: getMarkerShape(),
+        ytts_marker_color: getMarkerColor()
+      },
+      videos: getAllSavedVideos()
     };
   }
-  function formatHotkey(hotkey) {
-    if (!hotkey || !hotkey.key) return "";
-    const parts = [];
-    if (hotkey.ctrl) parts.push("Ctrl");
-    if (hotkey.alt) parts.push("Alt");
-    if (hotkey.shift) parts.push("Shift");
-    if (hotkey.meta) parts.push("Meta");
-    parts.push(normalizeKey(hotkey.key));
-    return parts.join("+");
+  function parseBackup(text) {
+    try {
+      const data = JSON.parse(text);
+      return data?.format === "ytts-backup" && data.version === 1 ? data : null;
+    } catch {
+      return null;
+    }
   }
-  function matchesHotkey(event, hotkey) {
-    if (!event || !hotkey || !hotkey.key) return false;
-    const pressed = hotkeyFromEvent(event);
-    if (!pressed) return false;
-    return pressed.key === normalizeKey(hotkey.key) && pressed.ctrl === !!hotkey.ctrl && pressed.alt === !!hotkey.alt && pressed.shift === !!hotkey.shift && pressed.meta === !!hotkey.meta;
+  function downloadBackup(data, filename = `ytts-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`) {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }
-  var MODIFIER_KEYS, DEFAULT_HOTKEY;
-  var init_hotkey = __esm({
-    "src/utils/hotkey.js"() {
-      MODIFIER_KEYS = ["Shift", "Control", "Alt", "Meta", "AltGraph"];
-      DEFAULT_HOTKEY = {
-        key: "S",
-        ctrl: false,
-        alt: false,
-        shift: true,
-        meta: false
-      };
+  function readBackupFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+  function applyBackup(data) {
+    let settingsCount = 0;
+    let videosCount = 0;
+    let timestampsAdded = 0;
+    const affectedVideoIds = [];
+    const importedAt = (/* @__PURE__ */ new Date()).toISOString();
+    if (data?.settings && typeof data.settings === "object") {
+      for (const key of SETTING_KEYS) {
+        if (!Object.hasOwn(data.settings, key)) continue;
+        const serialized = serializeSetting(key, data.settings[key]);
+        if (serialized === void 0) continue;
+        try {
+          localStorage.setItem(key, serialized);
+          settingsCount++;
+        } catch (error) {
+          console.error("[YT Timestamp Manager] Failed to import setting:", error);
+        }
+      }
+    }
+    if (Array.isArray(data?.videos)) {
+      for (const video of data.videos) {
+        if (!video || typeof video.videoId !== "string" || !VIDEO_ID_RE.test(video.videoId) || RESERVED_VIDEO_IDS.has(video.videoId) || !Array.isArray(video.timestamps)) {
+          continue;
+        }
+        if (typeof video.title === "string" && video.title) {
+          saveVideoTitle(video.videoId, video.title);
+        }
+        const existing = loadTimestamps(video.videoId);
+        const occupiedTimes = new Set(existing.map(({ time }) => Math.round(time)));
+        const additions = [];
+        for (const timestamp of video.timestamps) {
+          if (!timestamp || !Number.isFinite(timestamp.time) || timestamp.time < 0) {
+            continue;
+          }
+          const roundedTime = Math.round(timestamp.time);
+          if (occupiedTimes.has(roundedTime)) continue;
+          occupiedTimes.add(roundedTime);
+          additions.push({
+            time: timestamp.time,
+            note: typeof timestamp.note === "string" ? timestamp.note : "",
+            creation: Number.isNaN(Date.parse(timestamp.creation)) ? importedAt : timestamp.creation
+          });
+        }
+        if (additions.length === 0) continue;
+        saveTimestamps(
+          video.videoId,
+          [...existing, ...additions].sort((a, b) => a.time - b.time)
+        );
+        const savedTimes = new Set(
+          loadTimestamps(video.videoId).map(({ time }) => Math.round(time))
+        );
+        const persistedCount = additions.filter(
+          ({ time }) => savedTimes.has(Math.round(time))
+        ).length;
+        if (persistedCount === 0) continue;
+        videosCount++;
+        timestampsAdded += persistedCount;
+        affectedVideoIds.push(video.videoId);
+      }
+    }
+    return { settingsCount, videosCount, timestampsAdded, affectedVideoIds };
+  }
+  var SETTING_KEYS, RESERVED_VIDEO_IDS, VIDEO_ID_RE, HEX_COLOR_RE2;
+  var init_backup = __esm({
+    "src/utils/backup.js"() {
+      init_storage();
+      SETTING_KEYS = [
+        "ytts_auto_cleanup",
+        "ytts_start_minimized",
+        "ytts_hotkey",
+        "ytts_retention_days",
+        "ytts_marker_shape",
+        "ytts_marker_color"
+      ];
+      RESERVED_VIDEO_IDS = /* @__PURE__ */ new Set([
+        "auto_cleanup",
+        "start_minimized",
+        "hotkey",
+        "retention_days",
+        "marker_shape",
+        "marker_color",
+        "pane_position"
+      ]);
+      VIDEO_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+      HEX_COLOR_RE2 = /^#[0-9a-f]{6}$/i;
     }
   });
 
@@ -1295,7 +1472,9 @@
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
   .ytts-settings-footer button,
-  #ytts-reset-position {
+  #ytts-reset-position,
+  #ytts-export-backup,
+  #ytts-import-backup {
     background: rgba(255, 255, 255, 0.1);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1306,7 +1485,9 @@
     transition: all 0.2s ease;
   }
   .ytts-settings-footer button:hover,
-  #ytts-reset-position:hover {
+  #ytts-reset-position:hover,
+  #ytts-export-backup:hover,
+  #ytts-import-backup:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.5);
   }
@@ -1370,7 +1551,8 @@
     color: white;
     border-bottom-color: #4FC3F7;
   }
-  #ytts-tab-videos {
+  #ytts-tab-videos,
+  #ytts-tab-backup {
     width: 420px;
     max-width: 100%;
   }
@@ -1691,18 +1873,55 @@
             className: "ytts-tab",
             textContent: "Videos"
           });
+          const backupTabBtn = el("button", {
+            className: "ytts-tab",
+            textContent: "Backup"
+          });
           const tabs = el("div", { className: "ytts-tabs" }, [
             settingsTabBtn,
-            videosTabBtn
+            videosTabBtn,
+            backupTabBtn
           ]);
           const settingsTab = el("div", { id: "ytts-tab-settings" });
           const videosTab = el("div", {
             id: "ytts-tab-videos",
             style: { display: "none" }
           });
+          const backupFileInput = el("input", {
+            type: "file",
+            accept: "application/json,.json",
+            style: { display: "none" },
+            on: {
+              change: () => {
+                const file = backupFileInput.files?.[0];
+                if (file) handlers.importBackup(file);
+              }
+            }
+          });
+          const backupTab = el(
+            "div",
+            { id: "ytts-tab-backup", style: { display: "none" } },
+            [
+              el("p", {
+                textContent: "Back up your settings and all saved video timestamps."
+              }),
+              el("button", {
+                id: "ytts-export-backup",
+                textContent: "Export backup",
+                on: { click: handlers.exportBackup }
+              }),
+              el("button", {
+                id: "ytts-import-backup",
+                textContent: "Import backup",
+                on: { click: () => backupFileInput.click() }
+              }),
+              backupFileInput
+            ]
+          );
           const body = el("div", { className: "ytts-settings-body" }, [
             settingsTab,
-            videosTab
+            videosTab,
+            backupTab
           ]);
           const hotkeyField = el("input", {
             id: "ytts-hotkey-field",
@@ -1857,16 +2076,19 @@
             ])
           ]);
           document.body.appendChild(modal);
-          const showVideosTab = (videos) => {
-            settingsTab.style.display = videos ? "none" : "";
-            videosTab.style.display = videos ? "" : "none";
-            settingsTabBtn.classList.toggle("ytts-tab-active", !videos);
-            videosTabBtn.classList.toggle("ytts-tab-active", videos);
-            saveBtn.style.display = videos ? "none" : "";
-            if (videos) ui.renderVideoList(videosTab);
+          const showTab = (name) => {
+            settingsTab.style.display = name === "settings" ? "" : "none";
+            videosTab.style.display = name === "videos" ? "" : "none";
+            backupTab.style.display = name === "backup" ? "" : "none";
+            settingsTabBtn.classList.toggle("ytts-tab-active", name === "settings");
+            videosTabBtn.classList.toggle("ytts-tab-active", name === "videos");
+            backupTabBtn.classList.toggle("ytts-tab-active", name === "backup");
+            saveBtn.style.display = name === "settings" ? "" : "none";
+            if (name === "videos") ui.renderVideoList(videosTab);
           };
-          settingsTabBtn.addEventListener("click", () => showVideosTab(false));
-          videosTabBtn.addEventListener("click", () => showVideosTab(true));
+          settingsTabBtn.addEventListener("click", () => showTab("settings"));
+          videosTabBtn.addEventListener("click", () => showTab("videos"));
+          backupTabBtn.addEventListener("click", () => showTab("backup"));
           closeBtn.addEventListener("click", () => modal.remove());
           cancelBtn.addEventListener("click", () => modal.remove());
           saveBtn.addEventListener("click", ui.saveSettings);
@@ -1960,11 +2182,7 @@
          * @returns {boolean} `true` se a limpeza automática estiver habilitada.
          */
         getAutoCleanupSetting() {
-          try {
-            return localStorage.getItem("ytts_auto_cleanup") === "true";
-          } catch {
-            return false;
-          }
+          return getAutoCleanup();
         },
         /**
          * Lê o prazo de retenção configurado, em dias.
@@ -1995,26 +2213,10 @@
          *   Atalho configurado, ou `null` se desligado.
          */
         getHotkeySetting() {
-          try {
-            const raw = localStorage.getItem("ytts_hotkey");
-            if (raw === null) return DEFAULT_HOTKEY;
-            const parsed = JSON.parse(raw);
-            if (parsed === null) return null;
-            if (parsed && typeof parsed.key === "string" && parsed.key) {
-              return parsed;
-            }
-            return DEFAULT_HOTKEY;
-          } catch {
-            return DEFAULT_HOTKEY;
-          }
+          return getHotkey();
         },
         getStartMinimizedSetting() {
-          try {
-            const val = localStorage.getItem("ytts_start_minimized");
-            return val === null ? true : val === "true";
-          } catch {
-            return true;
-          }
+          return getStartMinimized();
         },
         /**
          * Persiste as configurações do modal no localStorage e fecha o modal.
@@ -2078,6 +2280,7 @@
       init_clipboard();
       init_notification();
       init_hotkey();
+      init_backup();
       init_storage();
       init_progressMarkers();
       init_ui();
@@ -2314,6 +2517,43 @@
           if (ui.getAutoCleanupSetting()) {
             handlers.cleanExpired();
           }
+        },
+        /**
+         * Monta e baixa um backup das configurações e timestamps salvos.
+         */
+        exportBackup() {
+          downloadBackup(buildBackup());
+          showNotification("\u{1F4E4} Backup exported!");
+        },
+        /**
+         * Lê e aplica um arquivo de backup, atualizando o painel aberto.
+         * @param {File} file - Arquivo escolhido pelo usuário.
+         * @returns {Promise<object|null>} Resultado da importação, ou `null` se inválida.
+         */
+        async importBackup(file) {
+          let data;
+          try {
+            data = parseBackup(await readBackupFile(file));
+          } catch {
+            data = null;
+          }
+          if (!data) {
+            showNotification("\u274C Invalid backup file");
+            return null;
+          }
+          const result = applyBackup(data);
+          const currentVideoId = getVideoId();
+          if (currentVideoId && result.affectedVideoIds.includes(currentVideoId)) {
+            document.querySelectorAll("#ytls-pane ul li:not(.now-playing)").forEach((item) => item.remove());
+            handlers.loadSavedTimestamps();
+          }
+          progressMarkers.updateMarkers();
+          ui.updateSelectionUI();
+          document.querySelector("#ytts-settings-modal")?.remove();
+          showNotification(
+            `\u{1F4E5} ${result.timestampsAdded} timestamp${result.timestampsAdded === 1 ? "" : "s"} imported!`
+          );
+          return result;
         },
         /**
          * Remove timestamps expirados do localStorage e atualiza a lista e os marcadores
